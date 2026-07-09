@@ -1,0 +1,144 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=JetBrains+Mono:wght@300;400;500;600&family=Space+Grotesk:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;700;900&family=Unbounded:wght@400;700&family=Pacifico&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Merriweather", Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --animate-slide-up: slide-up 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-gradient-shift: gradientShift 12s ease infinite;
+  --animate-gradient-flow-slow: gradientShift 25s ease infinite;
+  --animate-shine-sweep: shine-sweep 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  --animate-icon-glare: icon-glare 3s ease-in-out infinite;
+  --animate-border-glow: border-glow 2s ease-in-out infinite alternate;
+  --animate-text-shimmer: text-shimmer var(--text-shimmer-speed, 3s) linear infinite;
+
+  @keyframes text-shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: 0% 0; }
+  }
+
+  @keyframes icon-glare {
+    0% { transform: translateX(-200%) skewX(-25deg); }
+    30% { transform: translateX(200%) skewX(-25deg); }
+    100% { transform: translateX(200%) skewX(-25deg); }
+  }
+
+  @keyframes slide-up {
+    0% { transform: translateY(100%); }
+    100% { transform: translateY(0); }
+  }
+
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  @keyframes shine-sweep {
+    0% { transform: translateX(-150%) skewX(-25deg); opacity: 0; }
+    2% { opacity: 1; }
+    18% { transform: translateX(180%) skewX(-25deg); opacity: 1; }
+    20% { opacity: 0; }
+    100% { transform: translateX(180%) skewX(-25deg); opacity: 0; }
+  }
+
+  @keyframes border-glow {
+    0% { box-shadow: 0 0 4px 1px var(--glow-color, rgba(99,102,241,0.2)); }
+    100% { box-shadow: 0 0 12px 4px var(--glow-color, rgba(99,102,241,0.6)); }
+  }
+}
+
+/* Base style resets if necessary */
+body {
+  background-color: #000;
+  color: #18181b;
+}
+
+/* Настройки фонового контейнера капель дождя */
+#rain-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  overflow: hidden;
+  background-color: #000;
+}
+
+/* Настройки фоновой картинки */
+#custom-bg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  min-width: 100%;
+  min-height: 100%;
+  max-width: none;
+  max-height: none;
+  /* Центрируем и слегка увеличиваем, чтобы скрыть края преломления капель */
+  transform: translate(-50%, -50%) scale(1.05);
+  object-fit: cover;
+  z-index: 0;
+}
+
+/* Настройки холста с дождем */
+#bg-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  pointer-events: none; /* Чтобы капли не мешали кликать на элементы под ними */
+}
+
+/* Контактный контейнер на переднем плане */
+#content-overlay {
+  position: relative;
+  z-index: 10;
+  background-color: transparent !important;
+}
+
+/* Custom scrollbar to make elements look elegant */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #e4e4e7;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #d4d4d8;
+}
+
+/* Custom icon color handler for styled blocks */
+[style*="--block-icon-color"] svg {
+  color: var(--block-icon-color) !important;
+  stroke: var(--block-icon-color) !important;
+}
+
+/* Animated text shimmer / running glint effect */
+.text-shimmer-effect {
+  background: linear-gradient(
+    90deg,
+    var(--text-shimmer-base, currentColor) 0%,
+    var(--text-shimmer-base, currentColor) 35%,
+    var(--text-shimmer-highlight, #ffffff) 50%,
+    var(--text-shimmer-base, currentColor) 65%,
+    var(--text-shimmer-base, currentColor) 100%
+  );
+  background-size: 300% 100%;
+  color: transparent !important;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  animation: var(--text-shimmer-anim, text-shimmer var(--text-shimmer-speed, 3s) linear infinite);
+}
+
+

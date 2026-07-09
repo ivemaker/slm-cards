@@ -1,0 +1,6 @@
+{
+  "name": "No-Code Page Builder",
+  "description": "A minimalist, mobile-first builder with local storage, WhatsApp checkout, and a beautifully integrated premium raindrops.js background effect.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
