@@ -51,6 +51,7 @@ import {
   Type,
   User,
   FolderPlus,
+  FolderOpen,
   ArrowUpDown,
   GripVertical,
   Monitor,
@@ -92,7 +93,10 @@ import { GlassRefractorWrapper, GlobalGlassFilters } from './components/GlassEff
 import { MediaBlockContent } from './components/MediaBlockContent';
 import { ProfileBlockContent } from './components/ProfileBlockContent';
 import { CornerGlowOverlay } from './components/CornerGlowOverlay';
+import { ProjectsTab } from './components/ProjectsTab';
+import { DashboardTab } from './components/DashboardTab';
 import { motion, AnimatePresence } from 'motion/react';
+import { useDev } from './context/DevContext';
 
 import { 
   compressImage, 
@@ -314,7 +318,8 @@ const isThemeSpecificProperty = (key: string): boolean => {
     k.includes('active') ||
     k.includes('hover') ||
     k.includes('preset') ||
-    k.includes('bezel')
+    k.includes('bezel') ||
+    k.includes('refractive')
   );
 };
 
@@ -594,10 +599,30 @@ export default function App() {
   }
 
   // Navigation tabs: 'landing' | 'projects' | 'editor' | 'dashboard' | 'preview'
-  const [activeTab, setActiveTab] = useState<'landing' | 'projects' | 'editor' | 'dashboard' | 'preview'>('landing');
+  const { userRole, setUserRole, planType, activeTab, setActiveTab, activeProjectId, projects } = useDev();
+
+  useEffect(() => {
+    if (userRole === 'guest' && activeTab !== 'landing') {
+      setActiveTab('landing');
+    }
+  }, [userRole, activeTab]);
   
   // Selection of template type
   const [templateType, setTemplateType] = useState<'business' | 'restaurant' | 'catalog'>('business');
+  
+  useEffect(() => {
+    if (activeProjectId) {
+      const activeProject = projects.find(p => p.id === activeProjectId);
+      if (activeProject) {
+        let targetType: 'business' | 'restaurant' | 'catalog' = 'business';
+        if (activeProject.type === 'menu') targetType = 'restaurant';
+        if (activeProject.type === 'catalog') targetType = 'catalog';
+        if (templateType !== targetType) {
+          setTemplateType(targetType);
+        }
+      }
+    }
+  }, [activeProjectId, projects, templateType]);
   
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
@@ -1680,6 +1705,85 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    if (planType === 'basic' && isDataLoaded) {
+      const premiumBgTypes = [
+        'css-waves', 'bezier-waves', 'webgl-metaballs', 'noise-topography',
+        'liquid-ripples', 'origami-ribbon', 'webgl-polylines', 'neon-stream',
+        'cyber-lines', 'vector-forms', 'research-network', 'geo-shapes',
+        'floating-cubes', 'clouds-3d'
+      ];
+      
+      const cleanBlockRecursive = (b: Block): Block => {
+        const cleaned: Block = { ...b };
+        if (cleaned.enableGlareEffect) cleaned.enableGlareEffect = false;
+        if (cleaned.enableGlowEffect) cleaned.enableGlowEffect = false;
+        if (cleaned.enableNoiseEffect) cleaned.enableNoiseEffect = false;
+        if (cleaned.enableGlassEffect) cleaned.enableGlassEffect = false;
+        
+        if (cleaned.type === 'profile' && cleaned.profileContent) {
+          cleaned.profileContent = {
+            ...cleaned.profileContent,
+            avatarGlowEnabled: false,
+            avatarShimmerEnabled: false,
+            avatarGlassEnabled: false
+          };
+        }
+        
+        if (cleaned.type === 'group' && cleaned.groupContent) {
+          cleaned.groupContent = {
+            ...cleaned.groupContent,
+            blocks: cleaned.groupContent.blocks.map(cleanBlockRecursive)
+          };
+        }
+        return cleaned;
+      };
+
+      const updatedConfigs = JSON.parse(JSON.stringify(configs));
+      let mutated = false;
+
+      (Object.keys(updatedConfigs) as Array<'business' | 'restaurant' | 'catalog'>).forEach((key) => {
+        const cfg = updatedConfigs[key];
+        let cfgMutated = false;
+        
+        const mainBg = cfg.mainBg;
+        if (mainBg) {
+          const themes: Array<'lightConfig' | 'darkConfig'> = ['lightConfig', 'darkConfig'];
+          themes.forEach(tKey => {
+            const themeCfg = mainBg[tKey];
+            if (themeCfg && themeCfg.effects) {
+              const cleanedEffects = themeCfg.effects.map((eff: any) => {
+                if (premiumBgTypes.includes(eff.type)) {
+                  cfgMutated = true;
+                  return { ...eff, type: 'blob' as any };
+                }
+                return eff;
+              });
+              themeCfg.effects = cleanedEffects;
+            }
+          });
+        }
+        
+        if (cfg.blocks) {
+          const originalBlocksJson = JSON.stringify(cfg.blocks);
+          const cleanedBlocks = cfg.blocks.map(cleanBlockRecursive);
+          if (JSON.stringify(cleanedBlocks) !== originalBlocksJson) {
+            cfg.blocks = cleanedBlocks;
+            cfgMutated = true;
+          }
+        }
+        
+        if (cfgMutated) {
+          mutated = true;
+        }
+      });
+
+      if (mutated) {
+        saveToLocalStorage(updatedConfigs, true);
+      }
+    }
+  }, [planType, isDataLoaded]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -1742,7 +1846,7 @@ export default function App() {
     saveToLocalStorage(updated);
   };
 
-  const updateBlocks = (newBlocks: Block[]) => {
+  const updateBlocks = (newBlocks: Block[], skipHistory: boolean = false) => {
     const updated = {
       ...configs,
       [templateType]: {
@@ -1750,7 +1854,7 @@ export default function App() {
         blocks: newBlocks
       }
     };
-    saveToLocalStorage(updated);
+    saveToLocalStorage(updated, skipHistory);
   };
 
   // Drag and drop layout states for layer editing
@@ -1810,6 +1914,9 @@ export default function App() {
                 } else {
                   (newMOverrides as any)[key] = val;
                 }
+              } else {
+                // Remove from mobile overrides so it falls back to base / dark block values correctly
+                delete (newMOverrides as any)[key];
               }
             });
             
@@ -1827,6 +1934,9 @@ export default function App() {
                 } else {
                   (newTOverrides as any)[key] = val;
                 }
+              } else {
+                // Remove from tablet overrides so it falls back to base / dark block values correctly
+                delete (newTOverrides as any)[key];
               }
             });
             
@@ -2009,7 +2119,7 @@ export default function App() {
     
     if (removed) {
       const afterInsert = insertBlockRecursive(afterRemove, removed, targetId, dragPosition || 'after');
-      updateBlocks(afterInsert);
+      updateBlocks(afterInsert, true);
       showToast(lang === 'en' ? 'Reordered layers successfully' : 'Порядок блоков успешно обновлен');
     }
 
@@ -2023,7 +2133,7 @@ export default function App() {
     if (!draggedBlockId) return;
     const { list: cleaned, removed } = removeBlockRecursive(config.blocks, draggedBlockId);
     if (removed) {
-      updateBlocks([...cleaned, removed]);
+      updateBlocks([...cleaned, removed], true);
       showToast(lang === 'en' ? 'Moved to page root' : 'Перемещено в корень страницы');
     }
     setDraggedBlockId(null);
@@ -2055,7 +2165,7 @@ export default function App() {
         return b;
       });
     };
-    updateBlocks(toggleRecursive(config.blocks));
+    updateBlocks(toggleRecursive(config.blocks), true);
   };
 
   // Rename a specific group
@@ -2084,7 +2194,7 @@ export default function App() {
         return b;
       });
     };
-    updateBlocks(renameRecursive(config.blocks));
+    updateBlocks(renameRecursive(config.blocks), true);
     showToast(lang === 'en' ? 'Group renamed' : 'Группа переименована');
   };
 
@@ -2113,7 +2223,7 @@ export default function App() {
     };
     
     const updated = unnestRecursive(config.blocks);
-    updateBlocks(updated);
+    updateBlocks(updated, true);
     if (selectedBlockId === groupId) {
       setSelectedBlockId(null);
     }
@@ -2158,7 +2268,7 @@ export default function App() {
     };
 
     const { list: updatedBlocks, moved } = moveRecursive(config.blocks);
-    if (moved) updateBlocks(updatedBlocks);
+    if (moved) updateBlocks(updatedBlocks, true);
   };
 
   // Add a brand-new Frame to layout config
@@ -2361,7 +2471,7 @@ export default function App() {
     }
 
     const modified = [...config.blocks, finalBlock];
-    updateBlocks(modified);
+    updateBlocks(modified, true);
     setSelectedBlockId(finalBlock.id);
     showToast(lang === 'en' ? `Added ${type} Frame` : `Добавлен блок: ${type}`);
   };
@@ -2402,14 +2512,14 @@ export default function App() {
       }, []);
     };
     
-    updateBlocks(duplicateRecursive(config.blocks));
+    updateBlocks(duplicateRecursive(config.blocks), true);
     showToast(lang === 'en' ? 'Frame duplicated' : 'Фрейм дублирован');
   };
 
   // Delete Frame Block
   const deleteBlock = (id: string) => {
     const { list: filtered } = removeBlockRecursive(config.blocks, id);
-    updateBlocks(filtered);
+    updateBlocks(filtered, true);
     if (selectedBlockId === id) {
       setSelectedBlockId(null);
     }
@@ -4645,69 +4755,75 @@ export default function App() {
                 <span className="hidden sm:inline">{lang === 'en' ? 'Landing' : 'Лендинг'}</span>
               </button>
               
-              <button
-                id="tab_projects"
-                onClick={() => setActiveTab('projects')}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
-                  activeTab === 'projects' 
-                    ? 'bg-white text-zinc-950 shadow-sm' 
-                    : 'text-zinc-500 hover:text-zinc-900'
-                }`}
-              >
-                <TrendingUp size={13} />
-                <span className="hidden sm:inline">{lang === 'en' ? 'Projects' : 'Проекты'}</span>
-              </button>
+              {userRole === 'authorized' && (
+                <>
+                  <button
+                    id="tab_projects"
+                    onClick={() => setActiveTab('projects')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
+                      activeTab === 'projects' 
+                        ? 'bg-white text-zinc-950 shadow-sm' 
+                        : 'text-zinc-500 hover:text-zinc-900'
+                    }`}
+                  >
+                    <TrendingUp size={13} />
+                    <span className="hidden sm:inline">{lang === 'en' ? 'Projects' : 'Проекты'}</span>
+                  </button>
 
-              <button
-                id="tab_editor"
-                onClick={() => setActiveTab('editor')}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
-                  activeTab === 'editor' 
-                    ? 'bg-white text-zinc-950 shadow-sm' 
-                    : 'text-zinc-500 hover:text-zinc-900'
-                }`}
-              >
-                <Sliders size={13} />
-                <span className="hidden sm:inline">{TRANSLATIONS[lang].editorTab}</span>
-              </button>
-              
-              <button
-                id="tab_dashboard"
-                onClick={() => setActiveTab('dashboard')}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
-                  activeTab === 'dashboard' 
-                    ? 'bg-white text-zinc-950 shadow-sm' 
-                    : 'text-zinc-500 hover:text-zinc-900'
-                }`}
-              >
-                <TrendingUp size={13} />
-                <span className="hidden sm:inline">{TRANSLATIONS[lang].dashboardTab}</span>
-              </button>
-              
-              <button
-                id="tab_preview"
-                onClick={() => {
-                  setActiveTab('preview');
-                  // Simulate views growing when opening standalone preview!
-                  updateConfigField('views', config.views + 1);
-                }}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
-                  activeTab === 'preview' 
-                    ? 'bg-white text-zinc-950 shadow-sm' 
-                    : 'text-zinc-500 hover:text-zinc-900'
-                }`}
-              >
-                <Eye size={13} />
-                <span className="hidden sm:inline">{TRANSLATIONS[lang].previewTab}</span>
-              </button>
+                  <button
+                    id="tab_editor"
+                    onClick={() => setActiveTab('editor')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
+                      activeTab === 'editor' 
+                        ? 'bg-white text-zinc-950 shadow-sm' 
+                        : 'text-zinc-500 hover:text-zinc-900'
+                    }`}
+                  >
+                    <Sliders size={13} />
+                    <span className="hidden sm:inline">{TRANSLATIONS[lang].editorTab}</span>
+                  </button>
+                  
+                  <button
+                    id="tab_dashboard"
+                    onClick={() => setActiveTab('dashboard')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
+                      activeTab === 'dashboard' 
+                        ? 'bg-white text-zinc-950 shadow-sm' 
+                        : 'text-zinc-500 hover:text-zinc-900'
+                    }`}
+                  >
+                    <TrendingUp size={13} />
+                    <span className="hidden sm:inline">{TRANSLATIONS[lang].dashboardTab}</span>
+                  </button>
+                  
+                  <button
+                    id="tab_preview"
+                    onClick={() => {
+                      setActiveTab('preview');
+                      // Simulate views growing when opening standalone preview!
+                      updateConfigField('views', config.views + 1);
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
+                      (activeTab as string) === 'preview' 
+                        ? 'bg-white text-zinc-950 shadow-sm' 
+                        : 'text-zinc-500 hover:text-zinc-900'
+                    }`}
+                  >
+                    <Eye size={13} />
+                    <span className="hidden sm:inline">{TRANSLATIONS[lang].previewTab}</span>
+                  </button>
+                </>
+              )}
             </nav>
 
             {/* Right utility selections */}
             <div className="flex items-center gap-2">
               
-              <button className="text-zinc-500 hover:text-zinc-900 px-2 flex items-center transition-colors">
-                <Bell size={16} />
-              </button>
+              {userRole === 'authorized' && (
+                <button className="text-zinc-500 hover:text-zinc-900 px-2 flex items-center transition-colors">
+                  <Bell size={16} />
+                </button>
+              )}
               
               <button
                 onClick={() => setLang(l => l === 'en' ? 'ru' : 'en')}
@@ -4716,16 +4832,33 @@ export default function App() {
                 {lang === 'en' ? 'EN' : 'RU'}
               </button>
               
-              <button className="text-xs font-semibold px-3 py-1.5 text-zinc-700 hover:text-zinc-950 transition-colors">
-                {lang === 'en' ? 'Login' : 'Войти'}
-              </button>
-              
-              <button className="text-xs font-semibold px-3 py-1.5 bg-zinc-900 text-white rounded-md hover:bg-zinc-800 transition-colors shadow-sm">
-                {lang === 'en' ? 'Register' : 'Регистрация'}
-              </button>
+              {userRole === 'guest' ? (
+                <>
+                  <button className="text-xs font-semibold px-3 py-1.5 text-zinc-700 hover:text-zinc-950 transition-colors">
+                    {lang === 'en' ? 'Login' : 'Войти'}
+                  </button>
+                  
+                  <button className="text-xs font-semibold px-3 py-1.5 bg-zinc-900 text-white rounded-md hover:bg-zinc-800 transition-colors shadow-sm">
+                    {lang === 'en' ? 'Register' : 'Регистрация'}
+                  </button>
+                </>
+              ) : (
+                <div 
+                  onClick={() => setUserRole('guest')}
+                  className="flex items-center space-x-2 cursor-pointer group"
+                  title={lang === 'en' ? 'Click to Logout' : 'Выйти из аккаунта'}
+                >
+                  <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-semibold text-sm transition-transform group-hover:scale-105 shadow-sm">
+                    US
+                  </div>
+                  <span className="text-xs font-semibold text-zinc-700 group-hover:text-zinc-950 transition-colors hidden sm:inline">
+                    {lang === 'en' ? 'Profile' : 'Профиль'}
+                  </span>
+                </div>
+              )}
 
               {/* Quick Publish / Page Settings dialog toggle (Only in editor mode) */}
-              {activeTab === 'editor' && (
+              {userRole === 'authorized' && activeTab === 'editor' && (
                 <div className="flex items-center gap-1.5">
                   {config.mainBg && !config.mainBg.syncThemes && (
                     <button
@@ -4772,7 +4905,33 @@ export default function App() {
       <main className="flex-1 flex flex-col">
 
         {/* 1. THE CREATOR WORKSPACE (EDITOR TAB) */}
-        {activeTab === 'editor' && (
+        {activeTab === 'editor' && activeProjectId === null ? (
+          <div className="flex-1 w-full flex flex-col items-center justify-center p-8 bg-zinc-950 text-center animate-fade-in min-h-[70vh]">
+            <div className="max-w-md bg-zinc-900 border border-zinc-850 p-8 rounded-2xl shadow-2xl flex flex-col items-center space-y-6">
+              <div className="w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-lg">
+                <FolderOpen className="w-8 h-8 animate-pulse" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-extrabold text-white tracking-tight">
+                  {lang === 'en' ? 'No Active Project Selected' : 'У вас нет активного проекта'}
+                </h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  {lang === 'en' 
+                    ? 'Please select an existing project in the "Projects" tab or create a new one to start working.' 
+                    : 'Пожалуйста, выберите существующий проект во вкладке «Проекты» или создайте новый, чтобы начать работу.'}
+                </p>
+              </div>
+              <button
+                onClick={() => setActiveTab('projects')}
+                id="btn-go-to-projects-placeholder"
+                className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-indigo-600/10 border border-indigo-500 hover:shadow-indigo-500/20 active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>{lang === 'en' ? 'Go to Projects' : 'Перейти к проектам'}</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ) : activeTab === 'editor' && (
           <div className="w-full flex flex-col items-stretch justify-center relative h-[calc(100vh-56px)] overflow-hidden">
             
             {/* LAYERS DRAWER BACKDROP OVERLAY */}
@@ -4905,6 +5064,7 @@ export default function App() {
                           {/* Desktop/PC Left side inspector with full scroll support */}
                           <div className="relative w-full h-full p-6 pb-16 overflow-y-auto flex-1">
                             <BlockInspector
+                              viewMode={viewMode}
                               focusedBlock={focusedBlock ? resolveBlockOverrides(focusedBlock, viewMode, config.mainBg?.syncThemes ? 'light' : (config.mainBg?.theme || 'light')) : null}
                               selectedBlockId={selectedBlockId}
                               config={config}
@@ -4952,6 +5112,7 @@ export default function App() {
                           <div className="w-10 h-1 bg-zinc-850/80 rounded-full mx-auto mb-3 flex-shrink-0" />
                           
                           <BlockInspector
+                            viewMode={viewMode}
                             focusedBlock={focusedBlock ? resolveBlockOverrides(focusedBlock, viewMode, config.mainBg?.syncThemes ? 'light' : (config.mainBg?.theme || 'light')) : null}
                             selectedBlockId={selectedBlockId}
                             config={config}
@@ -5252,124 +5413,12 @@ export default function App() {
 
         {/* PROJECTS TAB */}
         {activeTab === 'projects' && (
-          <div className="flex-1 w-full px-4 sm:px-6 md:px-8 py-8 animate-fade-in relative z-10">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight text-zinc-900">
-                {lang === 'en' ? 'My Projects' : 'Мои Проекты'}
-              </h2>
-              <p className="text-sm text-zinc-500 mt-1 max-w-2xl leading-relaxed">
-                {lang === 'en' ? 'Manage and create your nocode sites.' : 'Управляйте и создавайте свои сайты.'}
-              </p>
-            </div>
-
-            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-              {/* Render existing projects */}
-              {myProjects.map((p, i) => (
-                <div key={i} className="h-48 border border-zinc-200 rounded-2xl flex flex-col justify-between bg-white shadow-sm overflow-hidden p-5 relative group">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      {p.image ? (
-                         <img src={p.image} alt={p.title} className="w-10 h-10 rounded-full object-cover" />
-                      ) : (
-                         <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center">
-                           <span className="text-zinc-400 font-bold">{p.title?.charAt(0) || 'P'}</span>
-                         </div>
-                      )}
-                      <div>
-                        <h3 className="font-bold text-zinc-900 line-clamp-1 pr-6">{p.title || 'Untitled'}</h3>
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider">{p.type || 'unknown'}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setProjectToDeleteIndex(i)}
-                      className="text-zinc-400 hover:text-red-500 transition-colors p-1 rounded-md opacity-0 group-hover:opacity-100"
-                      title={lang === 'en' ? 'Delete Project' : 'Удалить проект'}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                  <button onClick={() => setActiveTab('editor')} className="w-full py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-semibold rounded-lg transition-colors mt-auto">
-                    {lang === 'en' ? 'Edit Project' : 'Редактировать'}
-                  </button>
-                </div>
-              ))}
-
-              {/* Create new project tile */}
-              <button
-                onClick={() => {
-                  setNewProjectStep(1);
-                  setNewProjectData({ type: '', title: '', subtitle: '', image: '', structure: 1, style: 1 });
-                  setShowNewProjectModal(true);
-                }}
-                className="group h-48 border-2 border-dashed border-zinc-300 hover:border-zinc-500 rounded-2xl flex flex-col items-center justify-center transition-all bg-zinc-50 hover:bg-zinc-100 cursor-pointer"
-              >
-                <div className="w-12 h-12 bg-zinc-200 group-hover:bg-zinc-300 rounded-full flex items-center justify-center text-zinc-600 transition-colors">
-                  <Plus size={24} />
-                </div>
-                <span className="mt-3 text-sm font-semibold text-zinc-600 group-hover:text-zinc-900 transition-colors">
-                  {lang === 'en' ? 'Create New Project' : 'Создать новый проект'}
-                </span>
-              </button>
-            </div>
-          </div>
+          <ProjectsTab lang={lang} />
         )}
 
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
-          <div className="flex-1 w-full px-4 sm:px-6 md:px-8 py-8 animate-fade-in relative z-10 overflow-y-auto">
-            <div className="max-w-4xl mx-auto space-y-8">
-              <div>
-                <h2 className="text-2xl font-bold tracking-tight text-zinc-900">
-                  {TRANSLATIONS[lang].analyticsTitle}
-                </h2>
-                <p className="text-sm text-zinc-500 mt-1 leading-relaxed">
-                  {lang === 'en' ? 'Track your project performance' : 'Отслеживайте эффективность вашего проекта'}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm">
-                  <div className="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-2">{TRANSLATIONS[lang].totalViews}</div>
-                  <div className="text-3xl font-bold text-zinc-900">{config.views}</div>
-                </div>
-                <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm">
-                  <div className="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-2">{TRANSLATIONS[lang].totalClicks}</div>
-                  <div className="text-3xl font-bold text-zinc-900">{config.clicks}</div>
-                </div>
-                <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm">
-                  <div className="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-2">{TRANSLATIONS[lang].totalConvs}</div>
-                  <div className="text-3xl font-bold text-zinc-900">{config.conversions}</div>
-                </div>
-                <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm">
-                  <div className="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-2">{TRANSLATIONS[lang].convRate}</div>
-                  <div className="text-3xl font-bold text-zinc-900">
-                    {config.views > 0 ? ((config.conversions / config.views) * 100).toFixed(1) : '0.0'}%
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
-                <h3 className="text-lg font-bold text-zinc-900 mb-4">{TRANSLATIONS[lang].qrCodeTitle}</h3>
-                <p className="text-sm text-zinc-500 mb-6">{TRANSLATIONS[lang].qrCodeHelp}</p>
-                <div className="flex flex-col sm:flex-row items-center gap-8">
-                  <div 
-                    className="w-48 h-48 bg-white border border-zinc-200 rounded-xl p-4 shadow-sm"
-                    dangerouslySetInnerHTML={{ __html: generateSimpleQRCodeSVG(`https://${config.customDomain || `${config.username}.creator.studio`}`) }}
-                  />
-                  <div className="space-y-3 w-full sm:w-auto">
-                    <button className="w-full px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
-                      <Download size={16} />
-                      {TRANSLATIONS[lang].downloadPng}
-                    </button>
-                    <button className="w-full px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
-                      <Download size={16} />
-                      {TRANSLATIONS[lang].downloadPdf}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <DashboardTab lang={lang} />
         )}
 
         {/* 3. SIMULATED PUBLIC VIEW STANDALONE SCREEN (PREVIEW TAB) */}
@@ -5670,7 +5719,6 @@ export default function App() {
                      {[
                        { id: 'business', label: lang === 'en' ? 'Business Card' : 'Визитка', icon: <User size={24} /> },
                        { id: 'restaurant', label: lang === 'en' ? 'Restaurant / Cafe' : 'Ресторан / Кафе', icon: <Coffee size={24} /> },
-                       { id: 'services', label: lang === 'en' ? 'Services' : 'Услуги', icon: <Scissors size={24} /> },
                        { id: 'catalog', label: lang === 'en' ? 'Product Catalog' : 'Каталог продуктов', icon: <ShoppingCart size={24} /> }
                      ].map(t => (
                        <button

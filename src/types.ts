@@ -49,7 +49,7 @@ export interface ProfileContent {
   avatar: string;
   name: string;
   bio: string;
-  avatarShape?: 'circle' | 'square' | 'rounded';
+  avatarShape?: 'circle' | 'square' | 'rounded' | 'none';
   layout?: 'stacked' | 'row';
   align?: 'left' | 'center' | 'right';
   fullWidth?: boolean;

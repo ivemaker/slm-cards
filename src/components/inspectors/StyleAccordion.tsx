@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Block, FramePadding, FrameRadius } from '../../types';
 import { compressImage } from '../../utils';
+import { useDev } from '../../context/DevContext';
 
 const getValidHexColor = (colorStr: string | undefined, fallback: string = '#ffffff'): string => {
   if (!colorStr) return fallback;
@@ -26,6 +27,15 @@ export const StyleAccordion: React.FC<StyleAccordionProps> = ({
   lang,
   updateFocusedBlock,
 }) => {
+  const { planType } = useDev();
+  const handlePremiumClick = (e: React.MouseEvent) => {
+    if (planType === 'basic') {
+      e.preventDefault();
+      e.stopPropagation();
+      alert("👑 Этот эффект доступен только для Premium проектов. Переключите тариф проекта на Premium в панели разработчика для тестирования!");
+    }
+  };
+
   const [isStylesExpanded, setIsStylesExpanded] = React.useState(false);
   const [isFillExpanded, setIsFillExpanded] = React.useState(false);
   const [isEffectsExpanded, setIsEffectsExpanded] = React.useState(false);
@@ -1030,11 +1040,15 @@ export const StyleAccordion: React.FC<StyleAccordionProps> = ({
           </div>
 
           {/* Effect 2: Contour Glare */}
-          <div className="space-y-2">
+          <div 
+            onClickCapture={handlePremiumClick}
+            className={`space-y-2 transition-all duration-200 ${planType === 'basic' ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-zinc-300">
+                <span className="text-[10px] font-bold text-zinc-300 flex items-center">
                   {lang === 'en' ? '✨ Animated Glare Sweep' : '✨ Пробегающий блик'}
+                  <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded ml-1.5 font-bold">PRO</span>
                 </span>
                 <span className="text-[8px] text-zinc-500">
                   {lang === 'en' ? 'A shining light beam sweeps across' : 'Периодический плавный световой блик'}
@@ -1043,7 +1057,8 @@ export const StyleAccordion: React.FC<StyleAccordionProps> = ({
               <button
                 type="button"
                 onClick={() => updateFocusedBlock(b => ({ enableGlareEffect: !b.enableGlareEffect }))}
-                className={`w-9 h-5 rounded-full p-0.5 transition-colors focus:outline-none cursor-pointer ${
+                disabled={planType === 'basic'}
+                className={`w-9 h-5 rounded-full p-0.5 transition-colors focus:outline-none cursor-pointer disabled:cursor-not-allowed ${
                   focusedBlock.enableGlareEffect ? 'bg-emerald-500' : 'bg-zinc-800'
                 }`}
               >
@@ -1067,7 +1082,8 @@ export const StyleAccordion: React.FC<StyleAccordionProps> = ({
                       step="0.5"
                       value={focusedBlock.glareEffectSpeed !== undefined ? focusedBlock.glareEffectSpeed : 4}
                       onChange={(e) => updateFocusedBlock(() => ({ glareEffectSpeed: parseFloat(e.target.value) }))}
-                      className="w-full accent-white bg-zinc-950 h-1.5 rounded-lg cursor-pointer"
+                      disabled={planType === 'basic'}
+                      className="w-full accent-white bg-zinc-950 h-1.5 rounded-lg cursor-pointer disabled:cursor-not-allowed"
                     />
                   </div>
 
@@ -1078,13 +1094,15 @@ export const StyleAccordion: React.FC<StyleAccordionProps> = ({
                         type="color"
                         value={focusedBlock.glareEffectColor || '#ffffff'}
                         onChange={(e) => updateFocusedBlock(() => ({ glareEffectColor: e.target.value }))}
-                        className="w-5 h-5 rounded border border-zinc-800 bg-transparent p-0 cursor-pointer overflow-hidden flex-shrink-0"
+                        disabled={planType === 'basic'}
+                        className="w-5 h-5 rounded border border-zinc-800 bg-transparent p-0 cursor-pointer overflow-hidden flex-shrink-0 disabled:cursor-not-allowed"
                       />
                       <input
                         type="text"
                         value={(focusedBlock.glareEffectColor || '#ffffff').toUpperCase()}
                         onChange={(e) => updateFocusedBlock(() => ({ glareEffectColor: e.target.value }))}
-                        className="w-full bg-transparent text-[8px] text-zinc-400 p-0 font-mono text-center focus:outline-none uppercase border-none"
+                        disabled={planType === 'basic'}
+                        className="w-full bg-transparent text-[8px] text-zinc-400 p-0 font-mono text-center focus:outline-none uppercase border-none disabled:cursor-not-allowed"
                       />
                     </div>
                   </div>
@@ -1094,11 +1112,15 @@ export const StyleAccordion: React.FC<StyleAccordionProps> = ({
           </div>
 
           {/* Effect 3: Outer Pulsating Glow */}
-          <div className="space-y-2">
+          <div 
+            onClickCapture={handlePremiumClick}
+            className={`space-y-2 transition-all duration-200 ${planType === 'basic' ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-zinc-300">
+                <span className="text-[10px] font-bold text-zinc-300 flex items-center">
                   {lang === 'en' ? '🔮 Pulsating Halo Glow' : '🔮 Пульсирующее свечение'}
+                  <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded ml-1.5 font-bold">PRO</span>
                 </span>
                 <span className="text-[8px] text-zinc-500">
                   {lang === 'en' ? 'A beautiful outer ambient light shadow' : 'Внешнее пульсирующее био-свечение около плашки'}
@@ -1107,7 +1129,8 @@ export const StyleAccordion: React.FC<StyleAccordionProps> = ({
               <button
                 type="button"
                 onClick={() => updateFocusedBlock(b => ({ enableGlowEffect: !b.enableGlowEffect }))}
-                className={`w-9 h-5 rounded-full p-0.5 transition-colors focus:outline-none cursor-pointer ${
+                disabled={planType === 'basic'}
+                className={`w-9 h-5 rounded-full p-0.5 transition-colors focus:outline-none cursor-pointer disabled:cursor-not-allowed ${
                   focusedBlock.enableGlowEffect ? 'bg-emerald-500' : 'bg-zinc-800'
                 }`}
               >
@@ -1131,7 +1154,8 @@ export const StyleAccordion: React.FC<StyleAccordionProps> = ({
                       step="0.5"
                       value={focusedBlock.glowEffectSpeed !== undefined ? focusedBlock.glowEffectSpeed : 2}
                       onChange={(e) => updateFocusedBlock(() => ({ glowEffectSpeed: parseFloat(e.target.value) }))}
-                      className="w-full accent-white bg-zinc-950 h-1.5 rounded-lg cursor-pointer"
+                      disabled={planType === 'basic'}
+                      className="w-full accent-white bg-zinc-950 h-1.5 rounded-lg cursor-pointer disabled:cursor-not-allowed"
                     />
                   </div>
 
@@ -1142,13 +1166,15 @@ export const StyleAccordion: React.FC<StyleAccordionProps> = ({
                         type="color"
                         value={focusedBlock.glowEffectColor || '#6366f1'}
                         onChange={(e) => updateFocusedBlock(() => ({ glowEffectColor: e.target.value }))}
-                        className="w-5 h-5 rounded border border-zinc-800 bg-transparent p-0 cursor-pointer overflow-hidden flex-shrink-0"
+                        disabled={planType === 'basic'}
+                        className="w-5 h-5 rounded border border-zinc-800 bg-transparent p-0 cursor-pointer overflow-hidden flex-shrink-0 disabled:cursor-not-allowed"
                       />
                       <input
                         type="text"
                         value={(focusedBlock.glowEffectColor || '#6366f1').toUpperCase()}
                         onChange={(e) => updateFocusedBlock(() => ({ glowEffectColor: e.target.value }))}
-                        className="w-full bg-transparent text-[8px] text-zinc-400 p-0 font-mono text-center focus:outline-none uppercase border-none"
+                        disabled={planType === 'basic'}
+                        className="w-full bg-transparent text-[8px] text-zinc-400 p-0 font-mono text-center focus:outline-none uppercase border-none disabled:cursor-not-allowed"
                       />
                     </div>
                   </div>
@@ -1158,11 +1184,15 @@ export const StyleAccordion: React.FC<StyleAccordionProps> = ({
           </div>
 
           {/* Effect 4: Analog Film Grain Noise */}
-          <div className="space-y-2">
+          <div 
+            onClickCapture={handlePremiumClick}
+            className={`space-y-2 transition-all duration-200 ${planType === 'basic' ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-zinc-300">
+                <span className="text-[10px] font-bold text-zinc-300 flex items-center">
                   {lang === 'en' ? '📻 Analog Film Grain' : '📻 Эффект зернистости / шума'}
+                  <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded ml-1.5 font-bold">PRO</span>
                 </span>
                 <span className="text-[8px] text-zinc-500">
                   {lang === 'en' ? 'Sophisticated noise grain texture overlay' : 'Роскошная текстура космической пыли'}
@@ -1171,7 +1201,8 @@ export const StyleAccordion: React.FC<StyleAccordionProps> = ({
               <button
                 type="button"
                 onClick={() => updateFocusedBlock(b => ({ enableNoiseEffect: !b.enableNoiseEffect }))}
-                className={`w-9 h-5 rounded-full p-0.5 transition-colors focus:outline-none cursor-pointer ${
+                disabled={planType === 'basic'}
+                className={`w-9 h-5 rounded-full p-0.5 transition-colors focus:outline-none cursor-pointer disabled:cursor-not-allowed ${
                   focusedBlock.enableNoiseEffect ? 'bg-emerald-500' : 'bg-zinc-800'
                 }`}
               >
@@ -1192,18 +1223,23 @@ export const StyleAccordion: React.FC<StyleAccordionProps> = ({
                   max="40"
                   value={focusedBlock.noiseEffectOpacity !== undefined ? focusedBlock.noiseEffectOpacity : 12}
                   onChange={(e) => updateFocusedBlock(() => ({ noiseEffectOpacity: parseInt(e.target.value) }))}
-                  className="w-full accent-white bg-zinc-950 h-1.5 rounded-lg cursor-pointer"
+                  disabled={planType === 'basic'}
+                  className="w-full accent-white bg-zinc-950 h-1.5 rounded-lg cursor-pointer disabled:cursor-not-allowed"
                 />
               </div>
             )}
           </div>
 
           {/* Effect 5: Glass refraction structure */}
-          <div className="space-y-2 border-t border-zinc-900/40 pt-2">
+          <div 
+            onClickCapture={handlePremiumClick}
+            className={`space-y-2 border-t border-zinc-900/40 pt-2 transition-all duration-200 ${planType === 'basic' ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-zinc-300">
+                <span className="text-[10px] font-bold text-zinc-300 flex items-center">
                   {lang === 'en' ? '💎 Glass Refraction' : '💎 Эффект: Стекло'}
+                  <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded ml-1.5 font-bold">PRO</span>
                 </span>
                 <span className="text-[8px] text-zinc-500">
                   {lang === 'en' ? 'Refraction bending at block edges as a physical lens' : 'Физическое преломление по краям плашки как у настоящего стекла'}
@@ -1222,7 +1258,8 @@ export const StyleAccordion: React.FC<StyleAccordionProps> = ({
                   }
                   return update;
                 })}
-                className={`w-9 h-5 rounded-full p-0.5 transition-colors focus:outline-none cursor-pointer ${
+                disabled={planType === 'basic'}
+                className={`w-9 h-5 rounded-full p-0.5 transition-colors focus:outline-none cursor-pointer disabled:cursor-not-allowed ${
                   focusedBlock.enableGlassEffect ? 'bg-emerald-500' : 'bg-zinc-800'
                 }`}
               >

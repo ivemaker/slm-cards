@@ -50,7 +50,9 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
       ? 'rounded-none'
       : profile.avatarShape === 'rounded'
         ? 'rounded-2xl'
-        : 'rounded-full';
+        : profile.avatarShape === 'none'
+          ? 'rounded-none border-none'
+          : 'rounded-full';
 
   const getRgbFromHex = (hex: string) => {
     let cleaned = hex.replace('#', '');
@@ -414,11 +416,13 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
   const avatarElement = showAvatar && profile.avatar ? (
     <div
       style={{
-        width: `${avatarSize}px`,
-        height: `${avatarSize}px`,
+        width: profile.avatarShape === 'none' ? '100%' : `${avatarSize}px`,
+        maxWidth: `${avatarSize}px`,
+        height: profile.avatarShape === 'none' ? 'auto' : `${avatarSize}px`,
+        aspectRatio: profile.avatarShape === 'none' ? 'auto' : '1 / 1',
         ...shadowStyle,
       }}
-      className={`select-none flex-shrink-0 relative ${shapeClass}`}
+      className={`select-none relative ${profile.avatarShape === 'none' || avatarSize > 200 ? 'flex-shrink' : 'flex-shrink-0'} ${shapeClass}`}
     >
       {shimmerStyleBlock}
       {glowElement}
@@ -426,7 +430,7 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
       <div
         style={{
           width: '100%',
-          height: '100%',
+          height: profile.avatarShape === 'none' ? 'auto' : '100%',
           ...(isSvgOrPng ? { filter: dropShadowFilter.trim() } : {})
         }}
         className={`relative ${isSvgOrPng ? '' : 'overflow-hidden'} ${shapeClass}`}
@@ -448,7 +452,7 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
           <img
             src={profile.avatar}
             alt={profile.name}
-            className={`object-cover bg-transparent w-full h-full`}
+            className={`object-cover bg-transparent w-full ${profile.avatarShape === 'none' ? 'h-auto' : 'h-full'}`}
             referrerPolicy="no-referrer"
             draggable={false}
           />
