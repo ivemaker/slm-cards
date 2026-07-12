@@ -16,7 +16,13 @@ export const CategoryHeaderInspector: React.FC<CategoryHeaderInspectorProps> = (
   const header = focusedBlock.categoryHeaderContent!;
 
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-4">
+      {/* SECTION: TITLE */}
+      <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5 mt-1.5">
+        <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />
+        <span>{lang === 'en' ? 'Section Header Title' : 'ЗАГОЛОВОК РАЗДЕЛА'}</span>
+      </div>
+
       <div className="flex gap-2 items-end">
         {/* Section Header Title Input */}
         <div className="flex-1">

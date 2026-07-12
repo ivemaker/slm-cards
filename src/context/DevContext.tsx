@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 
 export type UserRole = 'guest' | 'authorized';
 export type PlanType = 'basic' | 'premium';
-export type TabType = 'landing' | 'projects' | 'editor' | 'dashboard' | 'preview';
+export type TabType = 'landing' | 'projects' | 'editor' | 'dashboard' | 'preview' | 'settings';
 
 export interface MockProject {
   id: string;
@@ -24,17 +24,32 @@ export interface DevContextType {
   setActiveProjectId: (id: string | null) => void;
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
+  isSaving: boolean;
+  developerMode: boolean;
+  setDeveloperMode: (mode: boolean) => void;
 }
 
 const DevContext = createContext<DevContextType | undefined>(undefined);
 
-export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [userRole, setUserRole] = useState<UserRole>('authorized');
-  const [planType, setPlanTypeState] = useState<PlanType>('premium');
-  const [activeTab, setActiveTab] = useState<TabType>('landing');
-  const [activeProjectId, setActiveProjectIdState] = useState<string | null>(null);
+const getSaved = <T,>(key: string, fallback: T): T => {
+  try {
+    const val = localStorage.getItem(key);
+    return val ? JSON.parse(val) : fallback;
+  } catch (e) {
+    console.error("Failed to parse " + key + " from localStorage", e);
+    return fallback;
+  }
+};
 
-  const [projects, setProjects] = useState<MockProject[]>([
+export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [userRole, setUserRole] = useState<UserRole>(() => getSaved<UserRole>('slm_user_role', 'authorized'));
+  const [planType, setPlanTypeState] = useState<PlanType>(() => getSaved<PlanType>('slm_plan_type', 'premium'));
+  const [activeTab, setActiveTab] = useState<TabType>(() => getSaved<TabType>('slm_active_tab', 'landing'));
+  const [activeProjectId, setActiveProjectIdState] = useState<string | null>(() => getSaved<string | null>('slm_active_project_id', null));
+  const [isSaving, setIsSaving] = useState(false);
+  const [developerMode, setDeveloperMode] = useState<boolean>(() => getSaved<boolean>('slm_developer_mode', false));
+
+  const [projects, setProjects] = useState<MockProject[]>(() => getSaved<MockProject[]>('slm_projects', [
     {
       id: 'demo-card',
       name: 'Моя Визитка',
@@ -49,7 +64,30 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       plan: 'premium',
       createdAt: new Date().toLocaleDateString('ru-RU')
     }
-  ]);
+  ]));
+
+  const firstRender = useRef(true);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('slm_user_role', JSON.stringify(userRole));
+      localStorage.setItem('slm_plan_type', JSON.stringify(planType));
+      localStorage.setItem('slm_active_tab', JSON.stringify(activeTab));
+      localStorage.setItem('slm_active_project_id', JSON.stringify(activeProjectId));
+      localStorage.setItem('slm_projects', JSON.stringify(projects));
+      localStorage.setItem('slm_developer_mode', JSON.stringify(developerMode));
+
+      if (firstRender.current) {
+        firstRender.current = false;
+      } else {
+        setIsSaving(true);
+        const timer = setTimeout(() => setIsSaving(false), 1200);
+        return () => clearTimeout(timer);
+      }
+    } catch (e) {
+      console.error("Failed to write state to localStorage", e);
+    }
+  }, [userRole, planType, activeTab, activeProjectId, projects, developerMode]);
 
   const setPlanType = (newPlan: PlanType) => {
     setPlanTypeState(newPlan);
@@ -103,7 +141,10 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         deleteProject,
         setActiveProjectId,
         activeTab,
-        setActiveTab
+        setActiveTab,
+        isSaving,
+        developerMode,
+        setDeveloperMode
       }}
     >
       {children}

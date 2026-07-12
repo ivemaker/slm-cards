@@ -215,11 +215,14 @@ export const SocialsInspector: React.FC<SocialsInspectorProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* SECTION: SOCIAL LINK CHANNELS */}
+      <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5 mt-1.5">
+        <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />
+        <span>{lang === 'en' ? 'Social Link Channels' : 'КАНАЛЫ СВЯЗИ И ССЫЛКИ'}</span>
+      </div>
+
       {/* 1. SOCIAL LINK CHANNELS LIST */}
       <div className="space-y-3">
-        <label className="block text-[9px] uppercase font-bold text-zinc-400 tracking-wider">
-          {lang === 'en' ? 'Social Link Channels' : 'Каналы связи и ссылки'}
-        </label>
         <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
           {socials.links.map((link, idx) => (
             <div key={idx} className="bg-zinc-900 border border-zinc-850 p-2 rounded-lg space-y-2">
@@ -262,7 +265,13 @@ export const SocialsInspector: React.FC<SocialsInspectorProps> = ({
       </div>
 
       {/* 2. ICON LAYOUT CONFIGURATION */}
-      <div className="pt-3 border-t border-zinc-900 space-y-3.5">
+      <div className="pt-3 border-t border-zinc-800/60 space-y-3.5">
+        {/* SECTION: LAYOUT & STYLE */}
+        <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5">
+          <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />
+          <span>{lang === 'en' ? 'Layout & Style' : 'РАСПОЛОЖЕНИЕ И СТИЛЬ'}</span>
+        </div>
+
         <div>
           <label className="block text-[9px] uppercase font-bold text-zinc-400 tracking-wider mb-1">
             {lang === 'en' ? 'Layout Orientation' : 'Расположение (Вёрстка)'}

@@ -41,6 +41,10 @@ interface LayersPanelProps {
   onApplyTemplate: (preset: any) => void;
   onSaveCurrentStyle: () => void;
   onDeleteUserTemplate: (id: string, e: React.MouseEvent) => void;
+  isDevMode?: boolean;
+  onDeleteReadyTemplate?: (id: string) => void;
+  onUpdateReadyTemplates?: (templates: any[]) => void;
+  onAddReadyTemplate?: () => void;
 }
 
 export const LayersPanel: React.FC<LayersPanelProps> = ({
@@ -72,9 +76,19 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
   onApplyTemplate,
   onSaveCurrentStyle,
   onDeleteUserTemplate,
+  isDevMode = false,
+  onDeleteReadyTemplate,
+  onUpdateReadyTemplates,
+  onAddReadyTemplate,
 }) => {
   const [isLayersExpanded, setIsLayersExpanded] = React.useState(true);
   const [isTemplatesExpanded, setIsTemplatesExpanded] = React.useState(true);
+
+  // States for Ready-made templates drag and drop
+  const [draggedPresetId, setDraggedPresetId] = React.useState<string | null>(null);
+  const [dragOverPresetId, setDragOverPresetId] = React.useState<string | null>(null);
+  const [editingPresetId, setEditingPresetId] = React.useState<string | null>(null);
+  const [editingPresetName, setEditingPresetName] = React.useState('');
 
   const formatPrice = (price: number, currentLang: 'en' | 'ru') => {
     return currentLang === 'en' ? `$${price.toFixed(2)}` : `${Math.round(price * 75)} ₽`;
@@ -339,32 +353,91 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                   <div className="text-[9.5px] uppercase tracking-wider font-mono font-bold text-zinc-400">
                     {lang === 'en' ? "Ready-made Templates" : "Готовые шаблоны"}
                   </div>
+                  {isDevMode && onAddReadyTemplate && (
+                    <button
+                      type="button"
+                      onClick={() => onAddReadyTemplate()}
+                      className="text-[9px] text-amber-600 hover:text-amber-800 font-bold flex items-center gap-0.5 transition-colors px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 rounded border border-amber-200"
+                      title={lang === 'en' ? 'Add Current Style as Ready Template' : 'Добавить текущий стиль в готовые шаблоны'}
+                    >
+                      + {lang === 'en' ? 'Add' : 'Добавить'}
+                    </button>
+                  )}
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {presets.map((preset) => {
                     const isActive = currentConfig.designTemplate === preset.config?.designTemplate && 
-                                     (preset.config?.theme ? currentConfig.theme === preset.config?.theme : true);
+                                     (preset.config?.theme ? currentConfig.theme === preset.config?.theme : true) &&
+                                     currentConfig.mainBg?.lightConfig?.fillColor === preset.config?.mainBg?.lightConfig?.fillColor &&
+                                     currentConfig.mainBg?.darkConfig?.fillColor === preset.config?.mainBg?.darkConfig?.fillColor;
                     return (
                       <div
                         key={preset.id}
                         role="button"
                         tabIndex={0}
-                        onClick={() => onApplyTemplate(preset)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            onApplyTemplate(preset);
+                        draggable={isDevMode}
+                        onDragStart={(e) => {
+                          if (isDevMode) {
+                            setDraggedPresetId(preset.id);
+                            e.dataTransfer.effectAllowed = 'move';
                           }
                         }}
-                        className={`group relative flex flex-col items-center justify-between p-1 rounded-lg border text-center cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-purple-500 transition-all ${
+                        onDragOver={(e) => {
+                          if (isDevMode && draggedPresetId && draggedPresetId !== preset.id) {
+                            e.preventDefault();
+                            setDragOverPresetId(preset.id);
+                          }
+                        }}
+                        onDragLeave={() => {
+                          if (isDevMode) setDragOverPresetId(null);
+                        }}
+                        onDrop={(e) => {
+                          if (isDevMode && draggedPresetId && draggedPresetId !== preset.id && onUpdateReadyTemplates) {
+                            e.preventDefault();
+                            const fromIndex = presets.findIndex(p => p.id === draggedPresetId);
+                            const toIndex = presets.findIndex(p => p.id === preset.id);
+                            if (fromIndex >= 0 && toIndex >= 0) {
+                              const newPresets = [...presets];
+                              const [moved] = newPresets.splice(fromIndex, 1);
+                              newPresets.splice(toIndex, 0, moved);
+                              onUpdateReadyTemplates(newPresets);
+                            }
+                            setDraggedPresetId(null);
+                            setDragOverPresetId(null);
+                          }
+                        }}
+                        onDragEnd={() => {
+                          if (isDevMode) {
+                            setDraggedPresetId(null);
+                            setDragOverPresetId(null);
+                          }
+                        }}
+                        onClick={() => {
+                          if (editingPresetId !== preset.id) onApplyTemplate(preset);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            if (editingPresetId !== preset.id) {
+                              e.preventDefault();
+                              onApplyTemplate(preset);
+                            }
+                          }
+                        }}
+                        className={`group relative flex flex-col items-center justify-between p-1 rounded-lg border text-center select-none outline-none focus-visible:ring-2 focus-visible:ring-purple-500 transition-all ${
+                          editingPresetId !== preset.id ? 'cursor-pointer' : ''
+                        } ${
                           isActive 
                             ? 'border-purple-600 bg-purple-50/10 ring-1 ring-purple-400/50' 
                             : 'border-zinc-200 hover:border-zinc-400 bg-zinc-50/40 hover:bg-zinc-50/80'
+                        } ${
+                          draggedPresetId === preset.id ? 'opacity-50' : ''
+                        } ${
+                          dragOverPresetId === preset.id ? 'ring-2 ring-blue-500 scale-105' : ''
                         }`}
                         title={lang === 'en' ? (preset.descriptionEn || preset.descriptionRu) : (preset.descriptionRu || preset.descriptionEn)}
                       >
                         {/* Square Aspect Mini Screen Preview */}
-                        <div className={`w-full aspect-square rounded-md bg-gradient-to-tr ${preset.previewGradient || 'from-zinc-50 via-zinc-100 to-zinc-200'} relative overflow-hidden flex flex-col justify-between p-1 shadow-sm group-hover:scale-[1.03] transition-all`}>
+                        <div className={`w-full aspect-square rounded-md bg-gradient-to-tr ${preset.previewGradient || 'from-zinc-50 via-zinc-100 to-zinc-200'} relative overflow-hidden flex flex-col justify-between p-1 shadow-sm ${editingPresetId !== preset.id ? 'group-hover:scale-[1.03]' : ''} transition-all`}>
                           
                           {/* Mini Notch */}
                           <div className="w-1/2 h-1 bg-black/60 rounded-full mx-auto mt-0.5" />
@@ -383,12 +456,90 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                               </span>
                             )}
                           </div>
+
+                          {/* Delete button for ready templates in Developer Mode */}
+                          {isDevMode && onDeleteReadyTemplate && editingPresetId !== preset.id && (
+                            <button
+                              type="button"
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                e.preventDefault(); 
+                                onDeleteReadyTemplate(preset.id); 
+                              }}
+                              className="absolute top-1 right-1 bg-red-650 hover:bg-red-750 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] transition-all font-bold z-10 hover:scale-110 shadow-md"
+                              title={lang === 'en' ? 'Remove from ready templates' : 'Удалить из готовых шаблонов'}
+                            >
+                              ✕
+                            </button>
+                          )}
                         </div>
 
-                        {/* Name */}
-                        <span className="text-[9px] font-semibold text-zinc-750 truncate w-full mt-1.5 block">
-                          {lang === 'en' ? (preset.nameEn || preset.nameRu) : (preset.nameRu || preset.nameEn)}
-                        </span>
+                        {/* Name (with double click to rename in dev mode) */}
+                        <div 
+                          className="w-full mt-1.5"
+                          onDoubleClick={(e) => {
+                            if (isDevMode && onUpdateReadyTemplates) {
+                              e.stopPropagation();
+                              setEditingPresetId(preset.id);
+                              setEditingPresetName(lang === 'en' ? (preset.nameEn || preset.nameRu) : (preset.nameRu || preset.nameEn));
+                            }
+                          }}
+                        >
+                          {editingPresetId === preset.id ? (
+                            <input
+                              autoFocus
+                              className="w-full text-[9px] font-semibold text-center text-zinc-900 border border-purple-500 rounded px-0.5 py-0.5 outline-none"
+                              value={editingPresetName}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => setEditingPresetName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (editingPresetName.trim() && onUpdateReadyTemplates) {
+                                    const newPresets = presets.map(p => {
+                                      if (p.id === preset.id) {
+                                        return {
+                                          ...p,
+                                          nameEn: lang === 'en' ? editingPresetName.trim() : p.nameEn,
+                                          nameRu: lang === 'ru' ? editingPresetName.trim() : p.nameRu,
+                                        };
+                                      }
+                                      return p;
+                                    });
+                                    onUpdateReadyTemplates(newPresets);
+                                  }
+                                  setEditingPresetId(null);
+                                } else if (e.key === 'Escape') {
+                                  setEditingPresetId(null);
+                                }
+                              }}
+                              onBlur={() => {
+                                if (editingPresetName.trim() && onUpdateReadyTemplates) {
+                                  const newPresets = presets.map(p => {
+                                    if (p.id === preset.id) {
+                                      return {
+                                        ...p,
+                                        nameEn: lang === 'en' ? editingPresetName.trim() : p.nameEn,
+                                        nameRu: lang === 'ru' ? editingPresetName.trim() : p.nameRu,
+                                      };
+                                    }
+                                    return p;
+                                  });
+                                  onUpdateReadyTemplates(newPresets);
+                                }
+                                setEditingPresetId(null);
+                              }}
+                            />
+                          ) : (
+                            <span 
+                              className="text-[9px] font-semibold text-zinc-750 truncate w-full block cursor-text"
+                              title={isDevMode ? "Double-click to rename" : ""}
+                            >
+                              {lang === 'en' ? (preset.nameEn || preset.nameRu) : (preset.nameRu || preset.nameEn)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -428,7 +579,9 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                   <div className="grid grid-cols-3 gap-2">
                     {userTemplates.map((tpl) => {
                       const isActive = currentConfig.designTemplate === tpl.config?.designTemplate && 
-                                       (tpl.config?.theme ? currentConfig.theme === tpl.config?.theme : true);
+                                       (tpl.config?.theme ? currentConfig.theme === tpl.config?.theme : true) &&
+                                       currentConfig.mainBg?.lightConfig?.fillColor === tpl.config?.mainBg?.lightConfig?.fillColor &&
+                                       currentConfig.mainBg?.darkConfig?.fillColor === tpl.config?.mainBg?.darkConfig?.fillColor;
                       return (
                         <div
                           key={tpl.id}

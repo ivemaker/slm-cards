@@ -3,6 +3,7 @@ import { Block, BgEffect } from '../../types';
 import { compressImage, normalizeEffectType } from '../../utils';
 import { CosmicPlasmaNebula } from '../CosmicPlasmaNebula';
 import { useDev } from '../../context/DevContext';
+import { useToast } from '../../context/ToastContext';
 import { BezierWaves } from '../BezierWaves';
 import { LiquidRipples } from '../LiquidRipples';
 import { OrigamiLine } from '../OrigamiLine';
@@ -46,6 +47,7 @@ export const MainBgInspector: React.FC<MainBgInspectorProps> = ({
   localStorageUploading,
 }) => {
   const { planType } = useDev();
+  const { error: toastError } = useToast();
   const mainBg = focusedBlock as any;
 
   const handleEffectTypeChange = (idx: number, effect: BgEffect, typeVal: string) => {
@@ -339,7 +341,7 @@ export const MainBgInspector: React.FC<MainBgInspectorProps> = ({
               'floating-cubes', 'clouds-3d'
             ].includes(val);
             if (isPremium && planType === 'basic') {
-              alert(lang === 'en' 
+              toastError(lang === 'en' 
                 ? "👑 This effect is only available for Premium plans. Upgrade the plan in Dev Tools to enable!"
                 : "👑 Этот эффект доступен только для Premium проектов. Переключите тариф проекта на Premium в панели разработчика для тестирования!"
               );

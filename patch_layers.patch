@@ -1,0 +1,28 @@
+--- src/components/LayersPanel.tsx
++++ src/components/LayersPanel.tsx
+@@ -367,8 +367,11 @@
+                 <div className="grid grid-cols-3 gap-2">
+                   {presets.map((preset) => {
+-                    const isActive = currentConfig.designTemplate === preset.config?.designTemplate && 
+-                                     (preset.config?.theme ? currentConfig.theme === preset.config?.theme : true);
++                    const isActive = currentConfig.designTemplate === preset.config?.designTemplate &&
++                                     (preset.config?.theme ? currentConfig.theme === preset.config?.theme : true) &&
++                                     currentConfig.mainBg?.lightConfig?.fillColor === preset.config?.mainBg?.lightConfig?.fillColor &&
++                                     currentConfig.mainBg?.darkConfig?.fillColor === preset.config?.mainBg?.darkConfig?.fillColor;
++                                     
+                     return (
+                       <div
+                         key={preset.id}
+@@ -577,8 +580,11 @@
+                   <div className="grid grid-cols-3 gap-2">
+                     {userTemplates.map((tpl) => {
+-                      const isActive = currentConfig.designTemplate === tpl.config?.designTemplate && 
+-                                       (tpl.config?.theme ? currentConfig.theme === tpl.config?.theme : true);
++                      const isActive = currentConfig.designTemplate === tpl.config?.designTemplate &&
++                                       (tpl.config?.theme ? currentConfig.theme === tpl.config?.theme : true) &&
++                                       currentConfig.mainBg?.lightConfig?.fillColor === tpl.config?.mainBg?.lightConfig?.fillColor &&
++                                       currentConfig.mainBg?.darkConfig?.fillColor === tpl.config?.mainBg?.darkConfig?.fillColor;
++                                       
+                       return (
+                         <div
+                           key={tpl.id}

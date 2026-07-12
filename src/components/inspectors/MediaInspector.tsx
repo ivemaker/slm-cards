@@ -100,12 +100,15 @@ export const MediaInspector: React.FC<MediaInspectorProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* SECTION: MEDIA TRACKS & SLIDES */}
+      <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5 mt-1.5">
+        <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />
+        <span>{lang === 'en' ? 'Media Tracks & Slides' : 'МЕДИАФАЙЛЫ И СЛАЙДЫ'}</span>
+      </div>
+
       {/* List of Slide Files */}
       <div className="space-y-3">
         <div className="flex justify-between items-center">
-          <label className="block text-[10px] uppercase font-mono font-bold text-zinc-400 tracking-wider">
-            {lang === 'en' ? 'Media Tracks & Slides' : 'Медиафайлы и слайды'}
-          </label>
           <span className="text-[10px] font-mono text-zinc-500">
             {items.length} {lang === 'en' ? 'item(s)' : 'об.'}
           </span>
@@ -301,11 +304,12 @@ export const MediaInspector: React.FC<MediaInspectorProps> = ({
       </div>
 
       {/* Slide & Player Configurations */}
-      <div className="pt-3 border-t border-zinc-900/60 space-y-3">
-        <label className="block text-[10px] uppercase font-mono font-bold text-zinc-400 tracking-wider flex items-center gap-1">
-          <Sliders size={12} className="text-amber-500" />
-          {lang === 'en' ? 'Media Display Options' : 'Настройки отображения медиа'}
-        </label>
+      <div className="pt-3 border-t border-zinc-800/60 space-y-3">
+        {/* SECTION: DISPLAY OPTIONS */}
+        <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5">
+          <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />
+          <span>{lang === 'en' ? 'Display Options' : 'НАСТРОЙКИ ОТОБРАЖЕНИЯ'}</span>
+        </div>
 
         {/* Grid display config layout */}
         <div className="grid grid-cols-2 gap-2.5">

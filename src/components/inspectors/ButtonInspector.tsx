@@ -18,7 +18,13 @@ export const ButtonInspector: React.FC<ButtonInspectorProps> = ({
   const button = focusedBlock.buttonContent!;
 
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-4">
+      {/* SECTION: BUTTON TEXT & STYLE */}
+      <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5 mt-1.5">
+        <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />
+        <span>{lang === 'en' ? 'Button Label & Style' : 'ТЕКСТ И СТИЛЬ КНОПКИ'}</span>
+      </div>
+
       <div className="flex gap-2 items-end">
         {/* Button Label Input */}
         <div className="flex-1">
@@ -102,6 +108,13 @@ export const ButtonInspector: React.FC<ButtonInspectorProps> = ({
           lang={lang}
         />
       </div>
+      {/* SECTION: LINK & APPEARANCE */}
+      <div className="pt-3 border-t border-zinc-800/60" />
+      <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5">
+        <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />
+        <span>{lang === 'en' ? 'Link & Appearance' : 'НАСТРОЙКИ ССЫЛКИ И ВНЕШНИЙ ВИД'}</span>
+      </div>
+
       <div>
         <label className="block text-[9px] uppercase font-bold text-zinc-400 tracking-wider mb-1 font-mono">{translations.block_btn_url}</label>
         <input

@@ -20,7 +20,13 @@ export const CatalogItemInspector: React.FC<CatalogItemInspectorProps> = ({
   const item = focusedBlock.catalogItemContent!;
 
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-4">
+      {/* SECTION: TITLE & PRICE */}
+      <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5 mt-1.5">
+        <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />
+        <span>{lang === 'en' ? 'Product Name & Price' : 'НАЗВАНИЕ И ЦЕНА'}</span>
+      </div>
+
       {/* Title block with Font selection, Title text and Color picker */}
       <div className="flex gap-2 items-end">
         {/* Title Input */}
@@ -121,6 +127,13 @@ export const CatalogItemInspector: React.FC<CatalogItemInspectorProps> = ({
           className="w-full bg-zinc-900 border border-zinc-800 text-xs rounded-lg p-2 text-white outline-none font-mono"
         />
       </div>
+      {/* SECTION: DESCRIPTION */}
+      <div className="pt-3 border-t border-zinc-800/60" />
+      <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5">
+        <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />
+        <span>{lang === 'en' ? 'Product Description' : 'ОПИСАНИЕ ТОВАРА'}</span>
+      </div>
+
       {/* Description Field with Font, Color Picker and Size Slider */}
       <div className="flex gap-2 items-end">
         {/* Description Textarea Input */}
@@ -204,6 +217,13 @@ export const CatalogItemInspector: React.FC<CatalogItemInspectorProps> = ({
           lang={lang}
         />
       </div>
+      {/* SECTION: PHOTO */}
+      <div className="pt-3 border-t border-zinc-800/60" />
+      <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5">
+        <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />
+        <span>{lang === 'en' ? 'Product Photo' : 'ФОТО ТОВАРА'}</span>
+      </div>
+
       <div>
         <label className="block text-[9px] uppercase font-bold text-zinc-400 tracking-wider mb-1.5 flex items-center justify-between">
           <span>Product Photo</span>

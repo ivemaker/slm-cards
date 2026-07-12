@@ -1,0 +1,23 @@
+--- server.ts
++++ server.ts
+@@ -189,6 +189,20 @@
+   }
+ });
+ 
++app.put("/api/custom-ready-templates", (req, res) => {
++  const newTemplates = req.body;
++  if (!Array.isArray(newTemplates)) {
++    res.status(400).json({ error: "Invalid templates array" });
++    return;
++  }
++  
++  if (writeTemplates(newTemplates)) {
++    res.json({ success: true, templates: newTemplates });
++  } else {
++    res.status(500).json({ error: "Failed to write templates" });
++  }
++});
++
+ app.delete("/api/custom-ready-templates/:id", (req, res) => {
+   const id = req.params.id;
+   if (!id) {

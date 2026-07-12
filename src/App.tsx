@@ -65,7 +65,9 @@ import {
   Scissors,
   X,
   Upload,
-  Bell
+  Bell,
+  Menu,
+  LogOut
 } from 'lucide-react';
 
 import { 
@@ -97,6 +99,8 @@ import { ProjectsTab } from './components/ProjectsTab';
 import { DashboardTab } from './components/DashboardTab';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDev } from './context/DevContext';
+import { SettingsTab } from './components/SettingsTab';
+import { useToast } from './context/ToastContext';
 
 import { 
   compressImage, 
@@ -549,6 +553,121 @@ function useActiveDevice(viewMode: 'desktop' | 'mobile' | 'tablet', isEditorMode
   return 'none';
 }
 
+// Template aesthetics preset definition
+const DESIGN_PRESETS = [
+  {
+    id: 'tpl-default',
+    nameEn: 'Basic White',
+    nameRu: 'Базовый',
+    descriptionEn: 'Clear white minimalism with elegant spacing.',
+    descriptionRu: 'Чистый светлый минимализм с аккуратным межстрочным полем.',
+    previewGradient: 'from-zinc-50 via-zinc-100 to-zinc-200',
+    config: {
+      designTemplate: 'none',
+      theme: 'modern',
+      mainBg: {
+        theme: 'light',
+        syncThemes: true,
+        lightConfig: {
+          fillType: 'color',
+          fillColor: '#FFFFFF'
+        }
+      },
+      blockDefaults: {
+        bgColor: 'bg-white',
+        textColor: 'text-black',
+        hasBorder: true,
+        customBorderColor: '#E5E7EB',
+        bgOpacity: 100,
+        enableShadow: false,
+        enableBlurEffect: false,
+        enableGlareEffect: false,
+        enableGlowEffect: false,
+        enableNoiseEffect: false,
+        enableHoverEffect: false
+      }
+    }
+  },
+  {
+    id: 'tpl-chroma',
+    nameEn: 'Chroma Lab',
+    nameRu: 'Хрома Лаб',
+    descriptionEn: 'Matte glass overlays with an ambient fluid spectrum field.',
+    descriptionRu: 'Стильное матовое стекло поверх живой орбитальной волны.',
+    previewGradient: 'from-purple-900 via-indigo-950 to-pink-950',
+    config: {
+      designTemplate: 'chroma-lab',
+      theme: 'modern',
+      mainBg: {
+        theme: 'dark',
+        syncThemes: true,
+        lightConfig: {
+          fillType: 'color',
+          fillColor: '#050505',
+          effects: [
+            { id: 'chroma-lab-eff', type: 'chroma-lab', color: '#ffffff', opacity: 100, speed: 1, position: 'bottom', height: 100, seed: 123, hue: 280 }
+          ]
+        },
+        darkConfig: {
+          fillType: 'color',
+          fillColor: '#050505',
+          effects: [
+            { id: 'chroma-lab-eff', type: 'chroma-lab', color: '#ffffff', opacity: 100, speed: 1, position: 'bottom', height: 100, seed: 123, hue: 280 }
+          ]
+        }
+      },
+      blockDefaults: {
+        bgColor: 'bg-zinc-950/40',
+        bgOpacity: 15,
+        borderRadius: 'lg',
+        hasBorder: true,
+        customBorderColor: 'oklch(0.9 0.05 280 / 0.3)',
+        hoverBorderColor: 'oklch(0.95 0.1 280 / 0.6)',
+        borderWidthValue: 1,
+        enableBlurEffect: true,
+        blurEffectAmount: 20,
+        enableShadow: true,
+        shadowSize: 25,
+        shadowIntensity: 90,
+        enableHoverEffect: true
+      }
+    }
+  },
+  {
+    id: 'tpl-retro',
+    nameEn: 'Basic Dark',
+    nameRu: 'Базовый темный',
+    descriptionEn: 'Deep black elegance with sharp contrasts.',
+    descriptionRu: 'Глубокая черная элегантность с четкими контрастами.',
+    previewGradient: 'from-zinc-800 via-zinc-900 to-black',
+    config: {
+      designTemplate: 'none',
+      theme: 'modern',
+      mainBg: {
+        theme: 'dark',
+        syncThemes: true,
+        darkConfig: {
+          fillType: 'color',
+          fillColor: '#000000',
+        }
+      },
+      blockDefaults: {
+        bgColor: 'bg-black',
+        textColor: 'text-white',
+        hasBorder: true,
+        customBorderColor: '#3F3F46',
+        bgOpacity: 100,
+        enableShadow: false,
+        enableBlurEffect: false,
+        enableGlareEffect: false,
+        enableGlowEffect: false,
+        enableNoiseEffect: false,
+        enableHoverEffect: false
+      }
+    }
+  }
+];
+
 export default function App() {
   // Synchronous top-level migration to permanently move existing user templates to ready-made templates list (v6)
   // This runs immediately upon initialization, before any useState initializers execute.
@@ -599,7 +718,8 @@ export default function App() {
   }
 
   // Navigation tabs: 'landing' | 'projects' | 'editor' | 'dashboard' | 'preview'
-  const { userRole, setUserRole, planType, activeTab, setActiveTab, activeProjectId, projects } = useDev();
+  const { userRole, setUserRole, planType, activeTab, setActiveTab, activeProjectId, projects, developerMode } = useDev();
+  const toast = useToast();
 
   useEffect(() => {
     if (userRole === 'guest' && activeTab !== 'landing') {
@@ -628,6 +748,8 @@ export default function App() {
 
   // Custom language switcher
   const [lang, setLang] = useState<'en' | 'ru'>('en');
+  const [isBurgerMenuOpen, setIsBurgerMenuOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   
   // Project Creation Modal State
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -667,9 +789,84 @@ export default function App() {
           catalog: c || DEFAULT_CONFIGS.catalog,
         });
 
+        let apiTemplates: any[] | null = null;
+        try {
+          const res = await fetch('/api/custom-ready-templates');
+          if (res.ok) {
+            apiTemplates = await res.json();
+          }
+        } catch (apiErr) {
+          console.warn('API fetch for custom templates failed, using storage fallback', apiErr);
+        }
+
         const savedReady = await get('nocode_custom_ready_templates') ?? localStorage.getItem('nocode_custom_ready_templates');
-        const parsedReady = typeof savedReady === 'string' ? JSON.parse(savedReady) : savedReady;
-        if (Array.isArray(parsedReady)) setCustomReadyTemplates(parsedReady.map(cleanTemplateConfig));
+        let localTemplates = typeof savedReady === 'string' ? JSON.parse(savedReady) : savedReady;
+        if (!Array.isArray(localTemplates)) {
+          localTemplates = [];
+        }
+
+        // Combine both sources by ID
+        const templateMap = new Map<string, any>();
+        const hasLocalSavedFlag = localStorage.getItem('nocode_templates_initialized');
+
+        // 1. Server-side templates
+        if (apiTemplates !== null && Array.isArray(apiTemplates)) {
+          localStorage.setItem('nocode_templates_initialized', 'true');
+          apiTemplates.forEach(t => {
+            if (t && t.id && t.id !== 'tpl-anakonda' && t.id !== 'anakonda' && t.nameEn?.toLowerCase() !== 'anakonda' && t.nameRu?.toLowerCase() !== 'anakonda') {
+              templateMap.set(t.id, t);
+            }
+          });
+        } else if (!hasLocalSavedFlag && localTemplates.length === 0) {
+          // Offline fallback only on very first load
+          localStorage.setItem('nocode_templates_initialized', 'true');
+          DESIGN_PRESETS.forEach(t => {
+            if (t && t.id && t.id !== 'tpl-anakonda' && t.id !== 'anakonda') {
+              templateMap.set(t.id, t);
+            }
+          });
+        }
+
+        // 2. User's browser local-only templates
+        localTemplates.forEach(t => {
+          if (t && t.id && t.id !== 'tpl-anakonda' && t.id !== 'anakonda' && t.nameEn?.toLowerCase() !== 'anakonda' && t.nameRu?.toLowerCase() !== 'anakonda') {
+            templateMap.set(t.id, t);
+          }
+        });
+
+        // Ensure any anakonda instances are deleted from the map
+        templateMap.delete('tpl-anakonda');
+        templateMap.delete('anakonda');
+
+        const mergedTemplates = Array.from(templateMap.values()).map(cleanTemplateConfig);
+        setCustomReadyTemplates(mergedTemplates);
+
+        // Update local storage/IndexedDB with the complete merged set
+        try {
+          localStorage.setItem('nocode_custom_ready_templates', JSON.stringify(mergedTemplates));
+          set('nocode_custom_ready_templates', mergedTemplates).catch(e => console.error(e));
+        } catch (e) {
+          console.warn('localStorage full');
+        }
+
+        // 4. Proactive Auto-sync: If server returned template list, upload local-only custom templates
+        if (Array.isArray(apiTemplates) && apiTemplates.length > 0) {
+          const apiIds = new Set(apiTemplates.map(t => t.id));
+          const localOnlyCustom = localTemplates.filter(t => t && t.id && !apiIds.has(t.id) && !t.id.startsWith('tpl-'));
+          
+          for (const localTpl of localOnlyCustom) {
+            try {
+              await fetch('/api/custom-ready-templates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cleanTemplateConfig(localTpl))
+              });
+              console.log(`Auto-synchronized template to server: ${localTpl.id}`);
+            } catch (syncErr) {
+              console.warn(`Failed to auto-sync template ${localTpl.id} to server`, syncErr);
+            }
+          }
+        }
 
         const savedUser = await get('nocode_user_templates') ?? localStorage.getItem('nocode_user_templates');
         const parsedUser = typeof savedUser === 'string' ? JSON.parse(savedUser) : savedUser;
@@ -776,207 +973,7 @@ export default function App() {
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
 
-  // Template aesthetics preset definition
-  const DESIGN_PRESETS = [
-    {
-      id: 'tpl-default',
-      nameEn: 'Basic White',
-      nameRu: 'Базовый',
-      descriptionEn: 'Clear white minimalism with elegant spacing.',
-      descriptionRu: 'Чистый светлый минимализм с аккуратным межстрочным полем.',
-      previewGradient: 'from-zinc-50 via-zinc-100 to-zinc-200',
-      config: {
-        designTemplate: 'none',
-        theme: 'modern',
-        mainBg: {
-          theme: 'light',
-          syncThemes: true,
-          lightConfig: {
-            fillType: 'color',
-            fillColor: '#FFFFFF'
-          }
-        },
-        blockDefaults: {
-          bgColor: 'bg-white',
-          textColor: 'text-black',
-          hasBorder: true,
-          customBorderColor: '#E5E7EB',
-          bgOpacity: 100,
-          enableShadow: false,
-          enableBlurEffect: false,
-          enableGlareEffect: false,
-          enableGlowEffect: false,
-          enableNoiseEffect: false,
-          enableHoverEffect: false
-        }
-      }
-    },
-    {
-      id: 'tpl-chroma',
-      nameEn: 'Chroma Lab',
-      nameRu: 'Хрома Лаб',
-      descriptionEn: 'Matte glass overlays with an ambient fluid spectrum field.',
-      descriptionRu: 'Стильное матовое стекло поверх живой орбитальной волны.',
-      previewGradient: 'from-purple-900 via-indigo-950 to-pink-950',
-      config: {
-        designTemplate: 'chroma-lab',
-        theme: 'modern',
-        mainBg: {
-          theme: 'dark',
-          syncThemes: true,
-          lightConfig: {
-            fillType: 'color',
-            fillColor: '#050505',
-            effects: [
-              { id: 'chroma-lab-eff', type: 'chroma-lab', color: '#ffffff', opacity: 100, speed: 1, position: 'bottom', height: 100, seed: 123, hue: 280 }
-            ]
-          },
-          darkConfig: {
-            fillType: 'color',
-            fillColor: '#050505',
-            effects: [
-              { id: 'chroma-lab-eff', type: 'chroma-lab', color: '#ffffff', opacity: 100, speed: 1, position: 'bottom', height: 100, seed: 123, hue: 280 }
-            ]
-          }
-        },
-        blockDefaults: {
-          bgColor: 'bg-zinc-950/40',
-          bgOpacity: 15,
-          borderRadius: 'lg',
-          hasBorder: true,
-          customBorderColor: 'oklch(0.9 0.05 280 / 0.3)',
-          hoverBorderColor: 'oklch(0.95 0.1 280 / 0.6)',
-          borderWidthValue: 1,
-          enableBlurEffect: true,
-          blurEffectAmount: 20,
-          enableShadow: true,
-          shadowSize: 25,
-          shadowIntensity: 90,
-          enableHoverEffect: true
-        }
-      }
-    },
-    {
-      id: 'tpl-retro',
-      nameEn: 'Basic Dark',
-      nameRu: 'Базовый темный',
-      descriptionEn: 'Deep black elegance with sharp contrasts.',
-      descriptionRu: 'Глубокая черная элегантность с четкими контрастами.',
-      previewGradient: 'from-zinc-800 via-zinc-900 to-black',
-      config: {
-        designTemplate: 'none',
-        theme: 'modern',
-        mainBg: {
-          theme: 'dark',
-          syncThemes: true,
-          darkConfig: {
-            fillType: 'color',
-            fillColor: '#000000',
-          }
-        },
-        blockDefaults: {
-          bgColor: 'bg-black',
-          textColor: 'text-white',
-          hasBorder: true,
-          customBorderColor: '#3F3F46',
-          bgOpacity: 100,
-          enableShadow: false,
-          enableBlurEffect: false,
-          enableGlareEffect: false,
-          enableGlowEffect: false,
-          enableNoiseEffect: false,
-          enableHoverEffect: false
-        }
-      }
-    },
-    {
-      id: 'tpl-anakonda',
-      nameEn: 'anakonda',
-      nameRu: 'anakonda',
-      descriptionEn: 'Premium deep emerald style with organic WebGL Metaballs.',
-      descriptionRu: 'Премиум-дизайн в глубоких изумрудных тонах с анимированными метасферами.',
-      previewGradient: 'from-emerald-900 via-teal-950 to-emerald-950',
-      config: {
-        designTemplate: 'none',
-        theme: 'modern',
-        mainBg: {
-          theme: 'dark',
-          syncThemes: true,
-          darkConfig: {
-            fillType: 'color',
-            fillColor: '#030908',
-            effects: [
-              {
-                id: 'anakonda-metaballs',
-                type: 'webgl-metaballs',
-                numMetaballs: 12,
-                minRadius: 50,
-                maxRadius: 150,
-                speed: 0.8,
-                color: '#059669',
-                plasmaColors: ['#047857', '#065f46', '#10b981'],
-                glowRadius: 2.0,
-                blur: 0.15,
-                outline: false,
-                fill: true,
-                mouseInteraction: true,
-                shadow: true,
-                shadowBlur: 20,
-                shadowOpacity: 50,
-                shadowAngle: 45,
-                shadowDistance: 10,
-                colorOpacity: 100,
-                opacity: 90
-              }
-            ]
-          },
-          lightConfig: {
-            fillType: 'color',
-            fillColor: '#f0fdf4',
-            effects: [
-              {
-                id: 'anakonda-metaballs-light',
-                type: 'webgl-metaballs',
-                numMetaballs: 12,
-                minRadius: 50,
-                maxRadius: 150,
-                speed: 0.8,
-                color: '#10b981',
-                plasmaColors: ['#a7f3d0', '#6ee7b7', '#34d399'],
-                glowRadius: 2.0,
-                blur: 0.15,
-                outline: false,
-                fill: true,
-                mouseInteraction: true,
-                shadow: true,
-                shadowBlur: 20,
-                shadowOpacity: 20,
-                shadowAngle: 45,
-                shadowDistance: 10,
-                colorOpacity: 50,
-                opacity: 50
-              }
-            ]
-          }
-        },
-        blockDefaults: {
-          bgColor: 'bg-emerald-950/25',
-          textColor: 'text-emerald-100',
-          hasBorder: true,
-          customBorderColor: 'rgba(16, 185, 129, 0.2)',
-          hoverBorderColor: 'rgba(52, 211, 153, 0.5)',
-          bgOpacity: 25,
-          borderRadius: 'xl',
-          enableBlurEffect: true,
-          blurEffectAmount: 12,
-          enableShadow: true,
-          shadowSize: 20,
-          shadowIntensity: 30,
-          enableHoverEffect: true
-        }
-      }
-    }
-  ];
+  // DESIGN_PRESETS relocated to top-level module scope to avoid Temporal Dead Zone (TDZ)
 
   // Migration completed synchronously at component start
   const [templateToApply, setTemplateToApply] = useState<any | null>(null);
@@ -989,169 +986,6 @@ export default function App() {
       setApplyToWindows(true);
     }
   }, [templateToApply]);
-
-  // Auto-save the latest changes into the global template "anakonda" upon load
-  useEffect(() => {
-    if (!isDataLoaded) return;
-    try {
-      const activeType = templateType;
-      const currentConfig = configs[activeType];
-      if (currentConfig) {
-        const savedReady = localStorage.getItem('nocode_custom_ready_templates');
-        let readyList: any[] = [];
-        if (savedReady) {
-          try {
-            readyList = JSON.parse(savedReady);
-          } catch (e) {}
-        }
-        if (!Array.isArray(readyList)) {
-          readyList = [];
-        }
-
-        const savedConfig = JSON.parse(JSON.stringify(currentConfig));
-
-        // Merge tablet overrides to base if any
-        const mergeTabletToBase = (blocksList: Block[]) => {
-          blocksList.forEach(b => {
-            if (b.tabletOverrides) {
-              Object.keys(b.tabletOverrides).forEach(key => {
-                const val = (b.tabletOverrides as any)[key];
-                if (val !== undefined) {
-                  if (key === 'spacerContent' && b.spacerContent) {
-                    b.spacerContent = { ...b.spacerContent, ...stripContentProperties(key, val) };
-                  } else if (key === 'profileContent' && b.profileContent) {
-                    b.profileContent = { ...b.profileContent, ...stripContentProperties(key, val) };
-                  } else if (key === 'socialsContent' && b.socialsContent) {
-                    b.socialsContent = { ...b.socialsContent, ...stripContentProperties(key, val) };
-                  } else if (key === 'mediaContent' && b.mediaContent) {
-                    b.mediaContent = { ...b.mediaContent, ...stripContentProperties(key, val) };
-                  } else {
-                    (b as any)[key] = stripContentProperties(key, val);
-                  }
-                }
-              });
-            }
-            if (b.type === 'group' && b.groupContent && b.groupContent.blocks) {
-              mergeTabletToBase(b.groupContent.blocks);
-            }
-          });
-        };
-        if (savedConfig.blocks) {
-          mergeTabletToBase(savedConfig.blocks);
-        }
-
-        const styleDefaults: any = { ...(savedConfig.blockDefaults || {}) };
-        if (savedConfig.blocks && savedConfig.blocks.length > 0) {
-          const firstBlock = savedConfig.blocks[0];
-          STYLE_KEYS.forEach(key => {
-            if (firstBlock[key] !== undefined) {
-              styleDefaults[key] = firstBlock[key];
-            }
-          });
-        }
-        savedConfig.blockDefaults = styleDefaults;
-
-        const blockTypeDefaults: Record<string, any> = {};
-        const collectStyles = (blocksList: Block[]) => {
-          blocksList.forEach(b => {
-            if (!blockTypeDefaults[b.type]) {
-              const styleObj: any = {};
-              STYLE_KEYS.forEach(key => {
-                if (b[key] !== undefined) {
-                  styleObj[key] = b[key];
-                }
-              });
-              if (b.type === 'socials' && b.socialsContent) {
-                styleObj.socialsContentStyle = {
-                  iconSize: b.socialsContent.iconSize,
-                  maxPerRow: b.socialsContent.maxPerRow,
-                  iconSpacing: b.socialsContent.iconSpacing,
-                  layout: b.socialsContent.layout,
-                  iconStyle: b.socialsContent.iconStyle ? JSON.parse(JSON.stringify(b.socialsContent.iconStyle)) : undefined
-                };
-              }
-              if (b.type === 'profile' && b.profileContent) {
-                styleObj.profileContentStyle = {
-                  avatarShape: b.profileContent.avatarShape,
-                  avatarSize: b.profileContent.avatarSize,
-                  layout: b.profileContent.layout,
-                  align: b.profileContent.align,
-                  fullWidth: b.profileContent.fullWidth,
-                  showAvatar: b.profileContent.showAvatar,
-                  bgImage: b.profileContent.bgImage,
-                  avatarBorderEnabled: b.profileContent.avatarBorderEnabled,
-                  avatarBorderWidth: b.profileContent.avatarBorderWidth,
-                  avatarBorderStyle: b.profileContent.avatarBorderStyle,
-                  avatarBorderColor: b.profileContent.avatarBorderColor,
-                  avatarShadowEnabled: b.profileContent.avatarShadowEnabled,
-                  avatarShadowBlur: b.profileContent.avatarShadowBlur,
-                  avatarShadowColor: b.profileContent.avatarShadowColor,
-                  avatarShadowOpacity: b.profileContent.avatarShadowOpacity,
-                  avatarShadowOffsetX: b.profileContent.avatarShadowOffsetX,
-                  avatarShadowOffsetY: b.profileContent.avatarShadowOffsetY,
-                  avatarGlowEnabled: b.profileContent.avatarGlowEnabled,
-                  avatarGlowColor: b.profileContent.avatarGlowColor,
-                  avatarGlowRadius: b.profileContent.avatarGlowRadius,
-                  avatarGlowIntensity: b.profileContent.avatarGlowIntensity,
-                  avatarShimmerEnabled: b.profileContent.avatarShimmerEnabled,
-                  avatarShimmerSpeed: b.profileContent.avatarShimmerSpeed,
-                  avatarShimmerColor: b.profileContent.avatarShimmerColor,
-                  avatarShimmerWidth: b.profileContent.avatarShimmerWidth,
-                  avatarShimmerInterval: b.profileContent.avatarShimmerInterval,
-                  avatarGlassEnabled: b.profileContent.avatarGlassEnabled,
-                  avatarGlassColor: b.profileContent.avatarGlassColor,
-                  avatarGlassOpacity: b.profileContent.avatarGlassOpacity,
-                  avatarGlassReflectIntensity: b.profileContent.avatarGlassReflectIntensity,
-                  avatarGlassType: b.profileContent.avatarGlassType,
-                  avatarGlassBlur: b.profileContent.avatarGlassBlur,
-                  avatarGlassAngle: b.profileContent.avatarGlassAngle,
-                  avatarSvgRaw: b.profileContent.avatarSvgRaw,
-                  avatarSvgColor: b.profileContent.avatarSvgColor
-                };
-              }
-              blockTypeDefaults[b.type] = styleObj;
-            }
-            if (b.type === 'group' && b.groupContent && b.groupContent.blocks) {
-              collectStyles(b.groupContent.blocks);
-            }
-          });
-        };
-        if (savedConfig.blocks) {
-          collectStyles(savedConfig.blocks);
-        }
-        savedConfig.blockTypeDefaults = blockTypeDefaults;
-
-        const existingIndex = readyList.findIndex(t => t.id === 'tpl-anakonda' || t.nameRu === 'anakonda' || t.nameEn === 'anakonda');
-
-        const anakondaTemplate = {
-          id: 'tpl-anakonda',
-          nameEn: 'anakonda',
-          nameRu: 'anakonda',
-          descriptionEn: 'Premium style saved with the latest changes',
-          descriptionRu: 'Премиум стиль с вашими последними изменениями',
-          previewGradient: 'from-emerald-900 via-teal-950 to-emerald-950',
-          config: savedConfig,
-          isUserTemplate: false
-        };
-
-        const cleanedAnakonda = cleanTemplateConfig(anakondaTemplate);
-
-        if (existingIndex >= 0) {
-          readyList[existingIndex] = cleanedAnakonda;
-        } else {
-          readyList.push(cleanedAnakonda);
-        }
-
-        set('nocode_custom_ready_templates', readyList).catch(e => console.error(e));
-        try {
-          localStorage.setItem('nocode_custom_ready_templates', JSON.stringify(readyList));
-        } catch (e) { console.warn('localStorage full'); }
-        setCustomReadyTemplates(readyList.map(cleanTemplateConfig));
-      }
-    } catch (err) {
-      console.error("Error auto-saving/updating anakonda template:", err);
-    }
-  }, [isDataLoaded]);
 
   // Undo/Redo History Stacks
   const [undoStack, setUndoStack] = useState<Record<'business' | 'restaurant' | 'catalog', ProjectConfig[]>>({
@@ -1166,6 +1000,8 @@ export default function App() {
   });
   const [showSaveStyleModal, setShowSaveStyleModal] = useState(false);
   const [styleSaveName, setStyleSaveName] = useState('');
+  const [showSaveReadyTemplateModal, setShowSaveReadyTemplateModal] = useState(false);
+  const [readyTemplateSaveName, setReadyTemplateSaveName] = useState('');
   const [templateToDeleteId, setTemplateToDeleteId] = useState<string | null>(null);
 
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile' | 'tablet'>('desktop');
@@ -1785,8 +1621,7 @@ export default function App() {
   }, [planType, isDataLoaded]);
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    toast.success(msg);
   };
 
   // State update handlers
@@ -2850,59 +2685,53 @@ export default function App() {
       }
       savedConfig.blockTypeDefaults = blockTypeDefaults;
 
-      const isAnakonda = name.toLowerCase() === 'anakonda';
       const newTemplate = {
-        id: isAnakonda ? 'tpl-anakonda' : 'user-' + Date.now(),
+        id: 'user-' + Date.now(),
         nameEn: name,
         nameRu: name,
-        descriptionEn: isAnakonda ? 'Premium style saved with the latest changes' : `Custom saved style (${templateType})`,
-        descriptionRu: isAnakonda ? 'Премиум стиль с вашими последними изменениями' : `Пользовательский стиль (${templateType})`,
-        previewGradient: isAnakonda ? 'from-emerald-900 via-teal-950 to-emerald-950' : previewGradient,
+        descriptionEn: `Custom saved style (${templateType})`,
+        descriptionRu: `Пользовательский стиль (${templateType})`,
+        previewGradient: previewGradient,
         config: savedConfig,
-        isUserTemplate: !isAnakonda
+        isUserTemplate: true
       };
 
       const cleanedNewTemplate = cleanTemplateConfig(newTemplate);
 
-      if (isAnakonda) {
-        // Save to global ready-made templates
-        const savedReady = localStorage.getItem('nocode_custom_ready_templates');
-        let readyList: any[] = [];
-        if (savedReady) {
-          try {
-            readyList = JSON.parse(savedReady);
-          } catch (e) {}
-        }
-        if (!Array.isArray(readyList)) {
-          readyList = [];
-        }
-        const existingIdx = readyList.findIndex(t => t.id === 'tpl-anakonda');
-        if (existingIdx >= 0) {
-          readyList[existingIdx] = cleanedNewTemplate;
-        } else {
-          readyList.push(cleanedNewTemplate);
-        }
-        set('nocode_custom_ready_templates', readyList).catch(e => console.error(e));
-        try {
-          localStorage.setItem('nocode_custom_ready_templates', JSON.stringify(readyList));
-        } catch (e) { console.warn('localStorage full'); }
-        setCustomReadyTemplates(readyList.map(cleanTemplateConfig));
-        showToast(lang === 'en' ? 'Style successfully saved to global templates as "anakonda"!' : 'Стиль успешно сохранен в глобальные шаблоны как "anakonda"!');
-      } else {
-        const updated = [...userTemplates, cleanedNewTemplate];
-        setUserTemplates(updated);
-        set('nocode_user_templates', updated).catch(e => console.error(e));
-        try {
-          localStorage.setItem('nocode_user_templates', JSON.stringify(updated));
-        } catch (e) { console.warn('localStorage full'); }
-        showToast(lang === 'en' ? 'Style successfully saved to templates!' : 'Стиль успешно сохранен в шаблоны!');
-      }
+      const updated = [...userTemplates, cleanedNewTemplate];
+      setUserTemplates(updated);
+      set('nocode_user_templates', updated).catch(e => console.error(e));
+      try {
+        localStorage.setItem('nocode_user_templates', JSON.stringify(updated));
+      } catch (e) { console.warn('localStorage full'); }
+      showToast(lang === 'en' ? 'Style successfully saved to templates!' : 'Стиль успешно сохранен в шаблоны!');
     } catch (err) {
       console.error("Error saving current style:", err);
       showToast(lang === 'en' ? 'Error saving style template' : 'Ошибка при сохранении шаблона');
     } finally {
       setShowSaveStyleModal(false);
     }
+  };
+
+  const handleSaveReadyTemplate = () => {
+    setReadyTemplateSaveName(
+      lang === 'en' 
+        ? `Ready Style ${customReadyTemplates.length + 1}` 
+        : `Готовый стиль ${customReadyTemplates.length + 1}`
+    );
+    setShowSaveReadyTemplateModal(true);
+  };
+
+  const handleConfirmSaveReadyTemplate = (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const name = readyTemplateSaveName.trim();
+    if (!name) return;
+    handleSaveCurrentAsReadyTemplate(name);
+    setReadyTemplateSaveName('');
+    setShowSaveReadyTemplateModal(false);
   };
 
   const handleDeleteUserTemplate = (id: string, e: React.MouseEvent) => {
@@ -2926,6 +2755,208 @@ export default function App() {
       console.error("Error deleting template:", err);
     } finally {
       setTemplateToDeleteId(null);
+    }
+  };
+
+  const handleDeleteReadyTemplate = async (id: string) => {
+    try {
+      const updated = customReadyTemplates.filter(t => t.id !== id);
+      setCustomReadyTemplates(updated);
+      set('nocode_custom_ready_templates', updated).catch(e => console.error(e));
+      try {
+        localStorage.setItem('nocode_custom_ready_templates', JSON.stringify(updated));
+      } catch (e) { console.warn('localStorage full'); }
+
+      try {
+        await fetch(`/api/custom-ready-templates/${id}`, { method: 'DELETE' });
+      } catch (apiErr) {
+        console.warn('Failed to delete ready template via API', apiErr);
+      }
+
+      showToast(lang === 'en' ? 'Template removed from ready-made' : 'Шаблон удален из готовых');
+    } catch (err) {
+      console.error("Error deleting ready template:", err);
+    }
+  };
+
+  const handleUpdateReadyTemplates = async (newTemplates: any[]) => {
+    try {
+      setCustomReadyTemplates(newTemplates);
+      set('nocode_custom_ready_templates', newTemplates).catch(e => console.error(e));
+      try {
+        localStorage.setItem('nocode_custom_ready_templates', JSON.stringify(newTemplates));
+      } catch (e) { console.warn('localStorage full'); }
+
+      try {
+        await fetch(`/api/custom-ready-templates`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newTemplates)
+        });
+      } catch (apiErr) {
+        console.warn('Failed to update ready templates via API', apiErr);
+      }
+    } catch (err) {
+      console.error("Error updating ready templates:", err);
+    }
+  };
+
+  const handleSaveCurrentAsReadyTemplate = async (name: string) => {
+    try {
+      const gradients = [
+        'from-purple-900 to-pink-900',
+        'from-slate-900 to-zinc-900',
+        'from-rose-950 to-orange-950',
+        'from-emerald-950 to-teal-950',
+        'from-indigo-950 to-blue-950'
+      ];
+      const previewGradient = gradients[Math.floor(Math.random() * gradients.length)];
+
+      const savedConfig = JSON.parse(JSON.stringify(configs[templateType]));
+      
+      const mergeTabletToBase = (blocksList: Block[]) => {
+        blocksList.forEach(b => {
+          if (b.tabletOverrides) {
+            Object.keys(b.tabletOverrides).forEach(key => {
+              const val = (b.tabletOverrides as any)[key];
+              if (val !== undefined) {
+                if (key === 'spacerContent' && b.spacerContent) {
+                  b.spacerContent = { ...b.spacerContent, ...stripContentProperties(key, val) };
+                } else if (key === 'profileContent' && b.profileContent) {
+                  b.profileContent = { ...b.profileContent, ...stripContentProperties(key, val) };
+                } else if (key === 'socialsContent' && b.socialsContent) {
+                  b.socialsContent = { ...b.socialsContent, ...stripContentProperties(key, val) };
+                } else if (key === 'mediaContent' && b.mediaContent) {
+                  b.mediaContent = { ...b.mediaContent, ...stripContentProperties(key, val) };
+                } else {
+                  (b as any)[key] = stripContentProperties(key, val);
+                }
+              }
+            });
+          }
+          if (b.type === 'group' && b.groupContent && b.groupContent.blocks) {
+            mergeTabletToBase(b.groupContent.blocks);
+          }
+        });
+      };
+      if (savedConfig.blocks) {
+        mergeTabletToBase(savedConfig.blocks);
+      }
+      
+      const styleDefaults: any = { ...(savedConfig.blockDefaults || {}) };
+      if (savedConfig.blocks && savedConfig.blocks.length > 0) {
+        const firstBlock = savedConfig.blocks[0];
+        STYLE_KEYS.forEach(key => {
+          if (firstBlock[key] !== undefined) {
+            styleDefaults[key] = firstBlock[key];
+          }
+        });
+      }
+      savedConfig.blockDefaults = styleDefaults;
+
+      const blockTypeDefaults: Record<string, any> = {};
+      const collectStyles = (blocksList: Block[]) => {
+        blocksList.forEach(b => {
+          if (!blockTypeDefaults[b.type]) {
+            const styleObj: any = {};
+            STYLE_KEYS.forEach(key => {
+              if (b[key] !== undefined) {
+                styleObj[key] = b[key];
+              }
+            });
+            if (b.type === 'socials' && b.socialsContent) {
+              styleObj.socialsContentStyle = {
+                iconSize: b.socialsContent.iconSize,
+                maxPerRow: b.socialsContent.maxPerRow,
+                iconSpacing: b.socialsContent.iconSpacing,
+                layout: b.socialsContent.layout,
+                iconStyle: b.socialsContent.iconStyle ? JSON.parse(JSON.stringify(b.socialsContent.iconStyle)) : undefined
+              };
+            }
+            if (b.type === 'profile' && b.profileContent) {
+              styleObj.profileContentStyle = {
+                avatarShape: b.profileContent.avatarShape,
+                avatarSize: b.profileContent.avatarSize,
+                layout: b.profileContent.layout,
+                align: b.profileContent.align,
+                fullWidth: b.profileContent.fullWidth,
+                showAvatar: b.profileContent.showAvatar,
+                bgImage: b.profileContent.bgImage,
+                avatarBorderEnabled: b.profileContent.avatarBorderEnabled,
+                avatarBorderWidth: b.profileContent.avatarBorderWidth,
+                avatarBorderStyle: b.profileContent.avatarBorderStyle,
+                avatarBorderColor: b.profileContent.avatarBorderColor,
+                avatarShadowEnabled: b.profileContent.avatarShadowEnabled,
+                avatarShadowBlur: b.profileContent.avatarShadowBlur,
+                avatarShadowColor: b.profileContent.avatarShadowColor,
+                avatarShadowOpacity: b.profileContent.avatarShadowOpacity,
+                avatarShadowOffsetX: b.profileContent.avatarShadowOffsetX,
+                avatarShadowOffsetY: b.profileContent.avatarShadowOffsetY,
+                avatarGlowEnabled: b.profileContent.avatarGlowEnabled,
+                avatarGlowColor: b.profileContent.avatarGlowColor,
+                avatarGlowRadius: b.profileContent.avatarGlowRadius,
+                avatarGlowIntensity: b.profileContent.avatarGlowIntensity,
+                avatarShimmerEnabled: b.profileContent.avatarShimmerEnabled,
+                avatarShimmerSpeed: b.profileContent.avatarShimmerSpeed,
+                avatarShimmerColor: b.profileContent.avatarShimmerColor,
+                avatarShimmerWidth: b.profileContent.avatarShimmerWidth,
+                avatarShimmerInterval: b.profileContent.avatarShimmerInterval,
+                avatarGlassEnabled: b.profileContent.avatarGlassEnabled,
+                avatarGlassColor: b.profileContent.avatarGlassColor,
+                avatarGlassOpacity: b.profileContent.avatarGlassOpacity,
+                avatarGlassReflectIntensity: b.profileContent.avatarGlassReflectIntensity,
+                avatarGlassType: b.profileContent.avatarGlassType,
+                avatarGlassBlur: b.profileContent.avatarGlassBlur,
+                avatarGlassAngle: b.profileContent.avatarGlassAngle,
+                avatarSvgRaw: b.profileContent.avatarSvgRaw,
+                avatarSvgColor: b.profileContent.avatarSvgColor
+              };
+            }
+            blockTypeDefaults[b.type] = styleObj;
+          }
+          if (b.type === 'group' && b.groupContent && b.groupContent.blocks) {
+            collectStyles(b.groupContent.blocks);
+          }
+        });
+      };
+      if (savedConfig.blocks) {
+        collectStyles(savedConfig.blocks);
+      }
+      savedConfig.blockTypeDefaults = blockTypeDefaults;
+
+      const newTemplate = {
+        id: 'ready-' + Date.now(),
+        nameEn: name,
+        nameRu: name,
+        descriptionEn: `Ready template saved from active designer`,
+        descriptionRu: `Готовый шаблон, сохраненный из дизайнера`,
+        previewGradient: previewGradient,
+        config: savedConfig,
+        isUserTemplate: false
+      };
+
+      const cleaned = cleanTemplateConfig(newTemplate);
+      const updated = [...customReadyTemplates, cleaned];
+      setCustomReadyTemplates(updated);
+      set('nocode_custom_ready_templates', updated).catch(e => console.error(e));
+      try {
+        localStorage.setItem('nocode_custom_ready_templates', JSON.stringify(updated));
+      } catch (e) { console.warn('localStorage full'); }
+
+      try {
+        await fetch('/api/custom-ready-templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cleaned)
+        });
+      } catch (apiErr) {
+        console.warn('Failed to save ready template via API', apiErr);
+      }
+
+      showToast(lang === 'en' ? 'Style saved to ready templates!' : 'Стиль добавлен в готовые шаблоны!');
+    } catch (err) {
+      console.error("Error adding ready template:", err);
+      showToast(lang === 'en' ? 'Error saving ready template' : 'Ошибка при добавлении в готовые шаблоны');
     }
   };
 
@@ -4630,6 +4661,66 @@ export default function App() {
         </div>
       )}
 
+      {/* SAVE CUSTOM READY TEMPLATE MODAL */}
+      {showSaveReadyTemplateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-zinc-950/60 backdrop-blur-sm transition-opacity cursor-pointer"
+            onClick={() => setShowSaveReadyTemplateModal(false)}
+          />
+          <form 
+            onSubmit={handleConfirmSaveReadyTemplate}
+            className="relative bg-zinc-900 border border-zinc-805 text-white rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-fade-in space-y-4 select-none text-left z-50"
+          >
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <h3 className="font-bold text-sm tracking-tight text-white flex items-center gap-2">
+                <Sparkle size={16} className="text-amber-400 animate-pulse" />
+                <span>{lang === 'en' ? 'Save as Ready Template' : 'Добавить в готовые шаблоны'}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowSaveReadyTemplateModal(false)}
+                className="text-zinc-500 hover:text-white transition-colors text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">
+                {lang === 'en' ? 'Template Name' : 'Название готового шаблона'}
+              </label>
+              <input
+                type="text"
+                maxLength={40}
+                required
+                value={readyTemplateSaveName}
+                onChange={(e) => setReadyTemplateSaveName(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-medium"
+                placeholder={lang === 'en' ? 'e.g. Amber Minimal' : 'например, Янтарный Минимал'}
+                autoFocus
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowSaveReadyTemplateModal(false)}
+                className="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white text-xs hover:bg-zinc-800 transition-all font-medium"
+              >
+                {lang === 'en' ? 'Cancel' : 'Отмена'}
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all shadow-lg shadow-amber-900/40"
+              >
+                {lang === 'en' ? 'Add Template' : 'Добавить шаблон'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* DELETE USER TEMPLATE CONFIRMATION MODAL */}
       {templateToDeleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -4722,187 +4813,343 @@ export default function App() {
 
       {/* TOP BAR / THE CREATOR NAV */}
       {activeTab !== 'preview' && (
-        <header id="top_bar" className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-zinc-200">
-          <div className="w-full px-4 sm:px-6 md:px-8 h-14 flex items-center justify-between gap-4">
+        <header id="top_bar" className="sticky top-0 z-40 bg-zinc-950 text-white border-b border-zinc-800/80">
+          <div className="w-full px-4 sm:px-6 md:px-8 h-16 flex items-center justify-between gap-4">
             
-            {/* Logo Brand / Presets */}
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded bg-zinc-950 flex items-center justify-center shadow-md">
-                <span className="text-white font-mono font-bold text-sm tracking-tighter">N</span>
+            {/* Left Side: Logo Brand */}
+            <div 
+              onClick={() => {
+                setActiveTab('landing');
+                setIsBurgerMenuOpen(false);
+              }}
+              className="flex items-center gap-3 cursor-pointer group select-none"
+            >
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+                <span className="text-white font-mono font-black text-lg tracking-tighter">S</span>
               </div>
               <div>
-                <h1 className="text-sm font-bold tracking-tight text-zinc-900">
-                  {TRANSLATIONS[lang].appName}
-                </h1>
-                <p className="text-[10px] text-zinc-400 font-mono tracking-tighter uppercase leading-none mt-0.5">
-                  {TRANSLATIONS[lang].subtitle}
+                <h1 className="text-sm font-black tracking-tight text-white leading-none group-hover:text-indigo-450 transition-colors">SLM Cards</h1>
+                <p className="text-[9px] text-zinc-500 font-mono tracking-wider uppercase mt-1 leading-none">
+                  {lang === 'en' ? 'NO-CODE PLATFORM' : 'NO-CODE ПЛАТФОРМА'}
                 </p>
               </div>
             </div>
 
-            {/* Center Tabs: State-Driven Route Simulation */}
-            <nav className="flex items-center space-x-1 bg-zinc-100 p-1 rounded-lg">
+            {/* Center Side: Tab Switcher (My Projects and Editor) */}
+            <nav className="hidden md:flex items-center space-x-1 bg-zinc-900/60 p-1 rounded-xl border border-zinc-800/50">
               <button
-                id="tab_landing"
-                onClick={() => setActiveTab('landing')}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
-                  activeTab === 'landing' 
-                    ? 'bg-white text-zinc-950 shadow-sm' 
-                    : 'text-zinc-500 hover:text-zinc-900'
+                id="tab_projects"
+                onClick={() => {
+                  setActiveTab('projects');
+                  setIsBurgerMenuOpen(false);
+                }}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  activeTab === 'projects' 
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-850/50'
                 }`}
               >
-                <Globe size={13} />
-                <span className="hidden sm:inline">{lang === 'en' ? 'Landing' : 'Лендинг'}</span>
+                <FolderOpen size={14} />
+                <span>{lang === 'en' ? 'My Projects' : 'Мои проекты'}</span>
               </button>
-              
-              {userRole === 'authorized' && (
-                <>
-                  <button
-                    id="tab_projects"
-                    onClick={() => setActiveTab('projects')}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
-                      activeTab === 'projects' 
-                        ? 'bg-white text-zinc-950 shadow-sm' 
-                        : 'text-zinc-500 hover:text-zinc-900'
-                    }`}
-                  >
-                    <TrendingUp size={13} />
-                    <span className="hidden sm:inline">{lang === 'en' ? 'Projects' : 'Проекты'}</span>
-                  </button>
 
-                  <button
-                    id="tab_editor"
-                    onClick={() => setActiveTab('editor')}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
-                      activeTab === 'editor' 
-                        ? 'bg-white text-zinc-950 shadow-sm' 
-                        : 'text-zinc-500 hover:text-zinc-900'
-                    }`}
-                  >
-                    <Sliders size={13} />
-                    <span className="hidden sm:inline">{TRANSLATIONS[lang].editorTab}</span>
-                  </button>
-                  
-                  <button
-                    id="tab_dashboard"
-                    onClick={() => setActiveTab('dashboard')}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
-                      activeTab === 'dashboard' 
-                        ? 'bg-white text-zinc-950 shadow-sm' 
-                        : 'text-zinc-500 hover:text-zinc-900'
-                    }`}
-                  >
-                    <TrendingUp size={13} />
-                    <span className="hidden sm:inline">{TRANSLATIONS[lang].dashboardTab}</span>
-                  </button>
-                  
-                  <button
-                    id="tab_preview"
-                    onClick={() => {
-                      setActiveTab('preview');
-                      // Simulate views growing when opening standalone preview!
-                      updateConfigField('views', config.views + 1);
-                    }}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
-                      (activeTab as string) === 'preview' 
-                        ? 'bg-white text-zinc-950 shadow-sm' 
-                        : 'text-zinc-500 hover:text-zinc-900'
-                    }`}
-                  >
-                    <Eye size={13} />
-                    <span className="hidden sm:inline">{TRANSLATIONS[lang].previewTab}</span>
-                  </button>
-                </>
-              )}
+              <button
+                id="tab_editor"
+                onClick={() => {
+                  setActiveTab('editor');
+                  setIsBurgerMenuOpen(false);
+                }}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  activeTab === 'editor' 
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-850/50'
+                }`}
+              >
+                <Sliders size={14} />
+                <span>{lang === 'en' ? 'Editor' : 'Редактор'}</span>
+              </button>
             </nav>
 
-            {/* Right utility selections */}
-            <div className="flex items-center gap-2">
+            {/* Right Side: Language switcher, notifications, profile, and hamburger */}
+            <div className="flex items-center gap-2 sm:gap-3">
               
-              {userRole === 'authorized' && (
-                <button className="text-zinc-500 hover:text-zinc-900 px-2 flex items-center transition-colors">
-                  <Bell size={16} />
-                </button>
-              )}
-              
-              <button
-                onClick={() => setLang(l => l === 'en' ? 'ru' : 'en')}
-                className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 hover:text-zinc-900 px-2 transition-colors border-r border-zinc-200"
-              >
-                {lang === 'en' ? 'EN' : 'RU'}
-              </button>
-              
-              {userRole === 'guest' ? (
-                <>
-                  <button className="text-xs font-semibold px-3 py-1.5 text-zinc-700 hover:text-zinc-950 transition-colors">
-                    {lang === 'en' ? 'Login' : 'Войти'}
-                  </button>
-                  
-                  <button className="text-xs font-semibold px-3 py-1.5 bg-zinc-900 text-white rounded-md hover:bg-zinc-800 transition-colors shadow-sm">
-                    {lang === 'en' ? 'Register' : 'Регистрация'}
-                  </button>
-                </>
-              ) : (
-                <div 
-                  onClick={() => setUserRole('guest')}
-                  className="flex items-center space-x-2 cursor-pointer group"
-                  title={lang === 'en' ? 'Click to Logout' : 'Выйти из аккаунта'}
-                >
-                  <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-semibold text-sm transition-transform group-hover:scale-105 shadow-sm">
-                    US
-                  </div>
-                  <span className="text-xs font-semibold text-zinc-700 group-hover:text-zinc-950 transition-colors hidden sm:inline">
-                    {lang === 'en' ? 'Profile' : 'Профиль'}
+              {/* Active Project Info Widget (Subtle badge) */}
+              {activeProjectId && (
+                <div className="hidden lg:flex items-center gap-2 bg-zinc-900/40 border border-zinc-800/60 px-3 py-1.5 rounded-lg text-xs">
+                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                  <span className="text-zinc-400 max-w-[120px] truncate">
+                    {projects.find(p => p.id === activeProjectId)?.name || 'Project'}
                   </span>
                 </div>
               )}
 
-              {/* Quick Publish / Page Settings dialog toggle (Only in editor mode) */}
-              {userRole === 'authorized' && activeTab === 'editor' && (
-                <div className="flex items-center gap-1.5">
-                  {config.mainBg && !config.mainBg.syncThemes && (
-                    <button
-                      onClick={() => {
-                        const nextTheme = config.mainBg.theme === 'dark' ? 'light' : 'dark';
-                        updateConfigField('mainBg', { ...config.mainBg, theme: nextTheme });
-                      }}
-                      className="px-2.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-700 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title={lang === 'en' ? 'Toggle Theme' : 'Переключить тему'}
-                    >
-                      {config.mainBg.theme === 'dark' ? <Sun size={13} className="text-amber-500" /> : <Moon size={13} className="text-blue-500" />}
-                      <span className="hidden sm:inline font-bold uppercase text-[9px]">
-                        {config.mainBg.theme === 'dark' ? (lang === 'en' ? 'Dark' : 'Темная') : (lang === 'en' ? 'Light' : 'Светлая')}
-                      </span>
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setShowPublishModal(true)}
-                    className="px-2.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-700 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                    title="Publish / Theme Settings"
+              {/* 👁️ PUBLIC PREVIEW BUTTON (Highly Prominent!) */}
+              {activeProjectId && (
+                <button
+                  onClick={() => {
+                    setActiveTab('preview');
+                    // Simulate views growth
+                    updateConfigField('views', config.views + 1);
+                    setIsBurgerMenuOpen(false);
+                  }}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                  title={lang === 'en' ? 'Open Public Preview' : 'Открыть публичный просмотр'}
+                >
+                  <Eye size={14} />
+                  <span className="hidden sm:inline">{lang === 'en' ? 'Public Preview' : 'Просмотр'}</span>
+                </button>
+              )}
+
+              {/* Notification bell */}
+              {userRole === 'authorized' && (
+                <div className="relative">
+                  <button 
+                    onClick={() => {
+                      setIsNotificationsOpen(!isNotificationsOpen);
+                      setIsBurgerMenuOpen(false);
+                    }}
+                    className="text-zinc-400 hover:text-white p-2 rounded-lg bg-zinc-900/40 hover:bg-zinc-900/80 border border-zinc-800/60 transition-colors relative h-9 w-9 flex items-center justify-center cursor-pointer"
                   >
-                    <Settings size={13} />
-                    <span className="hidden sm:inline">{TRANSLATIONS[lang].publishSettings}</span>
+                    <Bell size={15} />
+                    <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-rose-500 rounded-full ring-2 ring-zinc-950" />
                   </button>
+                  {isNotificationsOpen && (
+                    <div className="absolute right-0 mt-2 w-72 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl p-4 z-50 animate-scale-up">
+                      <div className="flex items-center justify-between border-b border-zinc-800 pb-2 mb-2">
+                        <span className="font-bold text-xs text-white">
+                          {lang === 'en' ? 'Notifications' : 'Уведомления'}
+                        </span>
+                        <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded font-bold font-mono">1 new</span>
+                      </div>
+                      <div className="space-y-2 py-1 max-h-48 overflow-y-auto">
+                        <div className="flex gap-2.5 p-2 rounded-lg bg-zinc-850 border border-zinc-800/60">
+                          <span className="w-2 h-2 bg-indigo-500 rounded-full mt-1.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-zinc-100">
+                              {lang === 'en' ? 'Welcome to SLM Cards!' : 'Добро пожаловать в SLM Cards!'}
+                            </p>
+                            <p className="text-[10px] text-zinc-400 leading-normal mt-0.5">
+                              {lang === 'en' 
+                                ? 'Start creating premium interactive micro-landings in minutes.' 
+                                : 'Начните создавать интерактивные микролендинги за пару минут.'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Quick Lang Switch */}
+              {/* RU/ENG Selector */}
               <button
-                onClick={() => setLang(lang === 'en' ? 'ru' : 'en')}
-                className="px-2.5 py-1.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-700 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors"
-                title="Change Language / Сменить язык"
+                onClick={() => setLang(l => l === 'en' ? 'ru' : 'en')}
+                className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 hover:text-white p-2 h-9 flex items-center justify-center bg-zinc-900/40 hover:bg-zinc-900/80 border border-zinc-800/60 rounded-lg transition-all cursor-pointer"
+                title={lang === 'en' ? 'Switch to Russian' : 'Переключить на английский'}
               >
-                <Languages size={13} />
-                <span className="text-[10px] font-bold uppercase">{lang === 'en' ? 'RU' : 'EN'}</span>
+                {lang === 'en' ? 'RU' : 'EN'}
               </button>
-            </div>
 
+              {/* Profile card / Login button */}
+              {userRole === 'guest' ? (
+                <div className="hidden sm:flex items-center gap-1.5">
+                  <button 
+                    onClick={() => {
+                      setUserRole('authorized');
+                      setActiveTab('projects');
+                    }}
+                    className="text-xs font-bold px-3 py-1.5 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    {lang === 'en' ? 'Login' : 'Войти'}
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setUserRole('authorized');
+                      setActiveTab('projects');
+                    }}
+                    className="text-xs font-bold px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors shadow-lg shadow-indigo-600/10 cursor-pointer"
+                  >
+                    {lang === 'en' ? 'Register' : 'Регистрация'}
+                  </button>
+                </div>
+              ) : (
+                <div className="hidden sm:flex items-center gap-2 bg-zinc-900/40 hover:bg-zinc-900/80 border border-zinc-800/60 p-1.5 pr-3 rounded-xl transition-all select-none">
+                  <div className="w-6 h-6 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-[10px] uppercase shadow-sm">
+                    US
+                  </div>
+                  <div className="flex flex-col text-left leading-none">
+                    <span className="text-[10px] font-bold text-zinc-200">ivemaker</span>
+                    <button 
+                      onClick={() => {
+                        setUserRole('guest');
+                        setActiveTab('landing');
+                      }}
+                      className="text-[9px] font-semibold text-zinc-500 hover:text-rose-450 text-left cursor-pointer transition-colors mt-0.5 leading-none"
+                    >
+                      {lang === 'en' ? 'Sign out' : 'Выйти'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 🍔 BURGER MENU TRIGGER BUTTON & DROPDOWN */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setIsBurgerMenuOpen(!isBurgerMenuOpen);
+                    setIsNotificationsOpen(false);
+                  }}
+                  className="p-2 text-zinc-400 hover:text-white rounded-lg bg-zinc-900/40 hover:bg-zinc-900/80 border border-zinc-800/60 transition-colors flex items-center justify-center h-9 w-9 cursor-pointer"
+                  title="Menu / Меню"
+                >
+                  {isBurgerMenuOpen ? <X size={16} /> : <Menu size={16} />}
+                </button>
+
+                {/* SMOOTH ANIMATED BURGER DROPDOWN LIST */}
+                <AnimatePresence>
+                  {isBurgerMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 mt-2 w-64 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 p-1.5 flex flex-col gap-0.5"
+                    >
+                      {/* Navigation links for MOBILE/TABLET (since they are hidden in center on small screens) */}
+                      <div className="md:hidden flex flex-col gap-0.5">
+                        <div className="px-3 py-1.5 text-[9px] text-zinc-500 uppercase tracking-wider font-bold">
+                          {lang === 'en' ? 'Workspace' : 'Рабочая область'}
+                        </div>
+                        
+                        <button
+                          onClick={() => {
+                            setActiveTab('projects');
+                            setIsBurgerMenuOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left cursor-pointer ${
+                            activeTab === 'projects' ? 'bg-indigo-600 text-white' : 'text-zinc-300 hover:bg-zinc-800'
+                          }`}
+                        >
+                          <FolderOpen size={14} className="shrink-0" />
+                          <span>{lang === 'en' ? 'My Projects' : 'Мои проекты'}</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setActiveTab('editor');
+                            setIsBurgerMenuOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left cursor-pointer ${
+                            activeTab === 'editor' ? 'bg-indigo-600 text-white' : 'text-zinc-300 hover:bg-zinc-800'
+                          }`}
+                        >
+                          <Sliders size={14} className="shrink-0" />
+                          <span>{lang === 'en' ? 'Editor' : 'Редактор'}</span>
+                        </button>
+                        
+                        <div className="h-px bg-zinc-800/60 my-1" />
+                      </div>
+
+                      {/* Management section */}
+                      <div className="px-3 py-1.5 text-[9px] text-zinc-500 uppercase tracking-wider font-bold">
+                        {lang === 'en' ? 'Management' : 'Управление'}
+                      </div>
+
+                      {userRole === 'authorized' ? (
+                        <>
+                          <button
+                            onClick={() => {
+                              setActiveTab('dashboard');
+                              setIsBurgerMenuOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
+                              activeTab === 'dashboard' ? 'bg-zinc-800 text-indigo-400' : 'text-zinc-300 hover:bg-zinc-800'
+                            }`}
+                          >
+                            <TrendingUp size={14} className="text-zinc-400 shrink-0" />
+                            <span>{lang === 'en' ? 'Statistics & Analytics' : 'Статистика и аналитика'}</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setActiveTab('settings');
+                              setIsBurgerMenuOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
+                              activeTab === 'settings' ? 'bg-zinc-800 text-indigo-400' : 'text-zinc-300 hover:bg-zinc-800'
+                            }`}
+                          >
+                            <Settings size={14} className="text-zinc-400 shrink-0" />
+                            <span>{lang === 'en' ? 'Platform Settings' : 'Настройки платформы'}</span>
+                          </button>
+                        </>
+                      ) : (
+                        <div className="text-[10px] text-zinc-500 italic px-3 py-2 bg-zinc-950/40 rounded-lg">
+                          {lang === 'en' ? 'Sign in to access analytics & settings.' : 'Войдите для доступа к аналитике и настройкам.'}
+                        </div>
+                      )}
+
+                      <div className="h-px bg-zinc-800/60 my-1" />
+
+                      {/* Account section */}
+                      <div className="px-3 py-1.5 text-[9px] text-zinc-500 uppercase tracking-wider font-bold">
+                        {lang === 'en' ? 'Account Profile' : 'Профиль аккаунта'}
+                      </div>
+
+                      {userRole === 'authorized' ? (
+                        <div className="p-1 flex flex-col gap-1">
+                          <div className="flex items-center gap-2 px-2 py-1.5 bg-zinc-950/30 rounded-lg border border-zinc-800/40">
+                            <div className="w-6 h-6 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-[10px] uppercase shrink-0">
+                              US
+                            </div>
+                            <div className="min-w-0 flex-1 leading-none">
+                              <p className="text-[10px] font-bold text-zinc-200 truncate leading-none">ivemaker@gmail.com</p>
+                              <p className="text-[8px] text-zinc-500 font-mono leading-none mt-1">
+                                {lang === 'en' ? 'Authorized Creator' : 'Создатель'}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              setUserRole('guest');
+                              setActiveTab('landing');
+                              setIsBurgerMenuOpen(false);
+                            }}
+                            className="w-full mt-1 px-3 py-2 bg-rose-950/20 hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 transition-colors text-left text-xs font-bold rounded-lg flex items-center gap-2.5 cursor-pointer"
+                          >
+                            <LogOut size={13} className="shrink-0 text-rose-450" />
+                            <span>{lang === 'en' ? 'Sign Out / Exit' : 'Выйти из аккаунта'}</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="p-1">
+                          <button
+                            onClick={() => {
+                              setUserRole('authorized');
+                              setActiveTab('projects');
+                              setIsBurgerMenuOpen(false);
+                            }}
+                            className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition-colors text-center cursor-pointer flex items-center justify-center gap-2"
+                          >
+                            <User size={13} />
+                            <span>{lang === 'en' ? 'Sign In / Log In' : 'Войти в аккаунт'}</span>
+                          </button>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
           </div>
         </header>
       )}
 
       {/* RENDER MASTER CONTENT VIEWS */}
-      <main className="flex-1 flex flex-col">
+      {activeTab !== 'preview' ? (
+        <div className="min-h-screen bg-zinc-50 flex flex-col text-zinc-900 font-sans">
+          <main className="flex-1 flex flex-col relative bg-zinc-50">
 
         {/* 1. THE CREATOR WORKSPACE (EDITOR TAB) */}
         {activeTab === 'editor' && activeProjectId === null ? (
@@ -4970,14 +5217,16 @@ export default function App() {
                 handleDropAtRoot={handleDropAtRoot}
                 setDragOverBlockId={setDragOverBlockId}
                 setDragPosition={setDragPosition}
-                presets={Array.from(
-                  new Map([...DESIGN_PRESETS, ...customReadyTemplates].map(item => [item.id, item])).values()
-                )}
+                presets={customReadyTemplates}
                 userTemplates={userTemplates}
                 currentConfig={config}
                 onApplyTemplate={setTemplateToApply}
                 onSaveCurrentStyle={handleSaveCurrentStyle}
                 onDeleteUserTemplate={handleDeleteUserTemplate}
+                isDevMode={developerMode}
+                onDeleteReadyTemplate={handleDeleteReadyTemplate}
+                onUpdateReadyTemplates={handleUpdateReadyTemplates}
+                onAddReadyTemplate={handleSaveReadyTemplate}
               />
             </div>
 
@@ -5404,9 +5653,103 @@ export default function App() {
 
         {/* LANDING TAB */}
         {activeTab === 'landing' && (
-          <div className="flex-1 w-full bg-zinc-950 flex flex-col items-center justify-center animate-fade-in absolute inset-0 z-0">
-            <div className="w-32 h-32 rounded-3xl bg-zinc-900 flex items-center justify-center shadow-2xl border border-zinc-800">
-              <span className="text-white font-mono font-bold text-6xl tracking-tighter">N</span>
+          <div className="flex-1 w-full bg-zinc-950 flex flex-col items-center justify-start py-12 sm:py-20 px-4 sm:px-6 md:px-8 text-center animate-fade-in relative overflow-hidden min-h-[calc(100vh-64px)] z-0">
+            {/* Ambient Background Glows */}
+            <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/10 rounded-full blur-[120px] pointer-events-none" />
+            
+            <div className="max-w-4xl mx-auto space-y-12 relative z-10 flex flex-col items-center">
+              {/* Premium Badge */}
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-semibold text-indigo-400 shadow-xl">
+                <Sparkle size={13} className="text-indigo-400 animate-pulse" />
+                <span>SLM Cards No-Code Premium v7.0</span>
+              </div>
+
+              {/* Header Title */}
+              <div className="space-y-4 max-w-2xl">
+                <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
+                  {lang === 'en' 
+                    ? 'Create Stunning Digital Cards & Micro-Landings' 
+                    : 'Создавайте стильные цифровые визитки и микролендинги'}
+                </h2>
+                <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
+                  {lang === 'en'
+                    ? 'The ultimate responsive builder with glass effects, 3D overlays, instant QR code distribution, and order catalogs. No coding required.'
+                    : 'Профессиональный адаптивный конструктор с эффектами стекла, 3D фонами, мгновенной генерацией QR-кодов и каталогами заказов. Без единой строчки кода.'}
+                </p>
+              </div>
+
+              {/* Interactive CTA buttons */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-md justify-center">
+                <button
+                  onClick={() => {
+                    if (userRole === 'guest') {
+                      setUserRole('authorized');
+                    }
+                    setActiveTab('projects');
+                  }}
+                  className="w-full sm:w-auto px-8 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/25 transition-all active:scale-98 cursor-pointer border border-indigo-500 flex items-center justify-center gap-2"
+                >
+                  <FolderPlus size={16} />
+                  <span>{lang === 'en' ? 'Create New Project' : 'Создать проект'}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (userRole === 'guest') {
+                      setUserRole('authorized');
+                    }
+                    setActiveTab('editor');
+                  }}
+                  className="w-full sm:w-auto px-8 py-3.5 bg-zinc-900 hover:bg-zinc-850 text-zinc-300 hover:text-white font-bold text-sm rounded-xl transition-all active:scale-98 cursor-pointer border border-zinc-800 flex items-center justify-center gap-2"
+                >
+                  <Sliders size={16} />
+                  <span>{lang === 'en' ? 'Open Editor Studio' : 'Открыть редактор'}</span>
+                </button>
+              </div>
+
+              {/* BENTO GRID / FEATURES HIGHLIGHT */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full pt-8 text-left">
+                {[
+                  {
+                    icon: <Layers className="text-indigo-400" size={20} />,
+                    title: lang === 'en' ? 'Dynamic Layouts' : 'Умные эффекты',
+                    desc: lang === 'en' 
+                      ? 'Frosted glass, interactive streams, custom gradient patterns.' 
+                      : 'Матовое стекло, неоновые потоки и кастомные градиентные узоры.'
+                  },
+                  {
+                    icon: <Smartphone className="text-purple-400" size={20} />,
+                    title: lang === 'en' ? '100% Adaptive' : '100% Адаптивность',
+                    desc: lang === 'en' 
+                      ? 'Engineered to look gorgeous on every smartphone, tablet, and PC.' 
+                      : 'Идеальное отображение на смартфонах, планшетах и компьютерах.'
+                  },
+                  {
+                    icon: <TrendingUp className="text-emerald-400" size={20} />,
+                    title: lang === 'en' ? 'Real-Time Stats' : 'Аналитика кликов',
+                    desc: lang === 'en' 
+                      ? 'Track visual views, button clicks, and order conversion instantly.' 
+                      : 'Отслеживайте просмотры, клики и конверсию в реальном времени.'
+                  },
+                  {
+                    icon: <ShoppingCart className="text-amber-400" size={20} />,
+                    title: lang === 'en' ? 'Order Catalogs' : 'Каталог продуктов',
+                    desc: lang === 'en' 
+                      ? 'Display digital products, menus, and collect quick orders.' 
+                      : 'Размещайте ваши цифровые товары и оформляйте заказы.'
+                  }
+                ].map((item, idx) => (
+                  <div key={idx} className="p-6 bg-zinc-900/60 border border-zinc-800/80 rounded-2xl flex flex-col gap-3 hover:border-zinc-700 transition-colors shadow-2xl">
+                    <div className="w-10 h-10 rounded-xl bg-zinc-850 border border-zinc-800 flex items-center justify-center shrink-0">
+                      {item.icon}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white tracking-tight">{item.title}</h4>
+                      <p className="text-xs text-zinc-400 leading-relaxed mt-1.5">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -5421,8 +5764,16 @@ export default function App() {
           <DashboardTab lang={lang} />
         )}
 
-        {/* 3. SIMULATED PUBLIC VIEW STANDALONE SCREEN (PREVIEW TAB) */}
-        {activeTab === 'preview' && (() => {
+        {/* SETTINGS TAB */}
+        {activeTab === 'settings' && (
+          <SettingsTab lang={lang} />
+        )}
+          </main>
+        </div>
+      ) : (
+        <main className="flex-1 flex flex-col">
+          {/* 3. SIMULATED PUBLIC VIEW STANDALONE SCREEN (PREVIEW TAB) */}
+          {activeTab === 'preview' && (() => {
           const bgInfo = getMainBgStyle(config.mainBg, windowScrollY);
           const isDarkTheme = config.mainBg?.theme === 'dark';
           const containerWidthClass = 'max-w-[800px] w-full';
@@ -5683,6 +6034,7 @@ export default function App() {
 
 
        </main>
+      )}
 
        {/* NEW PROJECT MODAL */}
        {showNewProjectModal && (

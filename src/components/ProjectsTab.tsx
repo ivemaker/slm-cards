@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDev, MockProject } from '../context/DevContext';
+import { useToast } from '../context/ToastContext';
 import { 
   Plus, 
   Trash2, 
@@ -28,6 +29,8 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
     setActiveTab 
   } = useDev();
 
+  const { success: toastSuccess } = useToast();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [type, setType] = useState<MockProject['type']>('personal_card');
@@ -50,6 +53,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
     }
     createProject(name.trim(), type, plan);
     setIsModalOpen(false);
+    toastSuccess(lang === 'en' ? 'Project successfully created' : 'Проект успешно создан');
     setActiveTab('editor');
   };
 
@@ -132,7 +136,10 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
                   </div>
 
                   <button
-                    onClick={() => deleteProject(project.id)}
+                    onClick={() => {
+                      deleteProject(project.id);
+                      toastSuccess(lang === 'en' ? 'Project successfully deleted' : 'Проект успешно удален');
+                    }}
                     id={`btn-delete-project-${project.id}`}
                     className="text-zinc-500 hover:text-rose-400 transition-colors p-1.5 rounded-lg bg-zinc-950/40 border border-zinc-850 hover:border-rose-950/50"
                     title={lang === 'en' ? 'Delete Project' : 'Удалить проект'}

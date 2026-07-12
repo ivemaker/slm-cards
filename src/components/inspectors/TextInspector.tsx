@@ -18,7 +18,13 @@ export const TextInspector: React.FC<TextInspectorProps> = ({
   const text = focusedBlock.textContent!;
 
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-4">
+      {/* SECTION: TITLE */}
+      <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5 mt-1.5">
+        <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />
+        <span>{lang === 'en' ? 'Main Title' : 'ГЛАВНЫЙ ЗАГОЛОВОК'}</span>
+      </div>
+
       {/* Title Field with Title Color, Font Family and Font Size */}
       <div className="flex gap-2 items-end">
         {/* Text Input */}
@@ -104,6 +110,13 @@ export const TextInspector: React.FC<TextInspectorProps> = ({
           onChange={(styles) => updateFocusedBlock(() => ({ titleTextStyles: styles }))}
           lang={lang}
         />
+      </div>
+
+      {/* SECTION: BODY TEXT */}
+      <div className="pt-3 border-t border-zinc-800/60" />
+      <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5">
+        <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />
+        <span>{lang === 'en' ? 'Description / Body Text' : 'ОПИСАНИЕ / ТЕКСТ'}</span>
       </div>
 
       {/* Body Field with Font, Color Picker and Size Slider */}

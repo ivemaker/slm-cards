@@ -1,0 +1,202 @@
+[
+  {
+    "id": "tpl-default",
+    "nameEn": "Basic White",
+    "nameRu": "Базовый",
+    "descriptionEn": "Clear white minimalism with elegant spacing.",
+    "descriptionRu": "Чистый светлый минимализм с аккуратным межстрочным полем.",
+    "previewGradient": "from-zinc-50 via-zinc-100 to-zinc-200",
+    "config": {
+      "designTemplate": "none",
+      "theme": "modern",
+      "mainBg": {
+        "theme": "light",
+        "syncThemes": true,
+        "lightConfig": {
+          "fillType": "color",
+          "fillColor": "#FFFFFF"
+        }
+      },
+      "blockDefaults": {
+        "bgColor": "bg-white",
+        "textColor": "text-black",
+        "hasBorder": true,
+        "customBorderColor": "#E5E7EB",
+        "bgOpacity": 100,
+        "enableShadow": false,
+        "enableBlurEffect": false,
+        "enableGlareEffect": false,
+        "enableGlowEffect": false,
+        "enableNoiseEffect": false,
+        "enableHoverEffect": false
+      }
+    }
+  },
+  {
+    "id": "tpl-chroma",
+    "nameEn": "Chroma Lab",
+    "nameRu": "Хрома Лаб",
+    "descriptionEn": "Matte glass overlays with an ambient fluid spectrum field.",
+    "descriptionRu": "Стильное матовое стекло поверх живой орбитальной волны.",
+    "previewGradient": "from-purple-900 via-indigo-950 to-pink-950",
+    "config": {
+      "designTemplate": "chroma-lab",
+      "theme": "modern",
+      "mainBg": {
+        "theme": "dark",
+        "syncThemes": true,
+        "lightConfig": {
+          "fillType": "color",
+          "fillColor": "#050505",
+          "effects": [
+            { "id": "chroma-lab-eff", "type": "chroma-lab", "color": "#ffffff", "opacity": 100, "speed": 1, "position": "bottom", "height": 100, "seed": 123, "hue": 280 }
+          ]
+        },
+        "darkConfig": {
+          "fillType": "color",
+          "fillColor": "#050505",
+          "effects": [
+            { "id": "chroma-lab-eff", "type": "chroma-lab", "color": "#ffffff", "opacity": 100, "speed": 1, "position": "bottom", "height": 100, "seed": 123, "hue": 280 }
+          ]
+        }
+      },
+      "blockDefaults": {
+        "bgColor": "bg-zinc-950/40",
+        "bgOpacity": 15,
+        "borderRadius": "lg",
+        "hasBorder": true,
+        "customBorderColor": "oklch(0.9 0.05 280 / 0.3)",
+        "hoverBorderColor": "oklch(0.95 0.1 280 / 0.6)",
+        "borderWidthValue": 1,
+        "enableBlurEffect": true,
+        "blurEffectAmount": 20,
+        "enableShadow": true,
+        "shadowSize": 25,
+        "shadowIntensity": 90,
+        "enableHoverEffect": true
+      }
+    }
+  },
+  {
+    "id": "tpl-retro",
+    "nameEn": "Basic Dark",
+    "nameRu": "Базовый темный",
+    "descriptionEn": "Deep black elegance with sharp contrasts.",
+    "descriptionRu": "Глубокая черная элегантность с четкими контрастами.",
+    "previewGradient": "from-zinc-800 via-zinc-900 to-black",
+    "config": {
+      "designTemplate": "none",
+      "theme": "modern",
+      "mainBg": {
+        "theme": "dark",
+        "syncThemes": true,
+        "darkConfig": {
+          "fillType": "color",
+          "fillColor": "#000000"
+        }
+      },
+      "blockDefaults": {
+        "bgColor": "bg-black",
+        "textColor": "text-white",
+        "hasBorder": true,
+        "customBorderColor": "#3F3F46",
+        "bgOpacity": 100,
+        "enableShadow": false,
+        "enableBlurEffect": false,
+        "enableGlareEffect": false,
+        "enableGlowEffect": false,
+        "enableNoiseEffect": false,
+        "enableHoverEffect": false
+      }
+    }
+  },
+  {
+    "id": "tpl-anakonda",
+    "nameEn": "anakonda",
+    "nameRu: ": "anakonda",
+    "nameRu": "anakonda",
+    "descriptionEn": "Premium deep emerald style with organic WebGL Metaballs.",
+    "descriptionRu": "Премиум-дизайн в глубоких изумрудных тонах с анимированными метасферами.",
+    "previewGradient": "from-emerald-900 via-teal-950 to-emerald-950",
+    "config": {
+      "designTemplate": "none",
+      "theme": "modern",
+      "mainBg": {
+        "theme": "dark",
+        "syncThemes": true,
+        "darkConfig": {
+          "fillType": "color",
+          "fillColor": "#030908",
+          "effects": [
+            {
+              "id": "anakonda-metaballs",
+              "type": "webgl-metaballs",
+              "numMetaballs": 12,
+              "minRadius": 50,
+              "maxRadius": 150,
+              "speed": 0.8,
+              "color": "#059669",
+              "plasmaColors": ["#047857", "#065f46", "#10b981"],
+              "glowRadius": 2.0,
+              "blur": 0.15,
+              "outline": false,
+              "fill": true,
+              "mouseInteraction": true,
+              "shadow": true,
+              "shadowBlur": 20,
+              "shadowOpacity": 50,
+              "shadowAngle": 45,
+              "shadowDistance": 10,
+              "colorOpacity": 100,
+              "opacity": 90
+            }
+          ]
+        },
+        "lightConfig": {
+          "fillType": "color",
+          "fillColor": "#f0fdf4",
+          "effects": [
+            {
+              "id": "anakonda-metaballs-light",
+              "type": "webgl-metaballs",
+              "numMetaballs": 12,
+              "minRadius": 50,
+              "maxRadius: ": 150,
+              "maxRadius": 150,
+              "speed": 0.8,
+              "color": "#10b981",
+              "plasmaColors": ["#a7f3d0", "#6ee7b7", "#34d399"],
+              "glowRadius": 2.0,
+              "blur": 0.15,
+              "outline": false,
+              "fill": true,
+              "mouseInteraction": true,
+              "shadow": true,
+              "shadowBlur": 20,
+              "shadowOpacity": 20,
+              "shadowAngle": 45,
+              "shadowDistance": 10,
+              "colorOpacity": 50,
+              "opacity": 50
+            }
+          ]
+        }
+      },
+      "blockDefaults": {
+        "bgColor": "bg-emerald-950/25",
+        "textColor": "text-emerald-100",
+        "hasBorder": true,
+        "customBorderColor": "rgba(16, 185, 129, 0.2)",
+        "hoverBorderColor": "rgba(52, 211, 153, 0.5)",
+        "bgOpacity": 25,
+        "borderRadius": "xl",
+        "enableBlurEffect": true,
+        "blurEffectAmount": 12,
+        "enableShadow": true,
+        "shadowSize": 20,
+        "shadowIntensity": 30,
+        "enableHoverEffect": true
+      }
+    }
+  }
+]

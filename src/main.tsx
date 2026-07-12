@@ -3,13 +3,16 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { DevProvider } from './context/DevContext';
+import { ToastProvider } from './context/ToastContext';
 import { DevPanel } from './components/DevPanel';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <DevProvider>
-      <App />
-      <DevPanel />
+      <ToastProvider>
+        <App />
+        <DevPanel />
+      </ToastProvider>
     </DevProvider>
   </StrictMode>,
 );
