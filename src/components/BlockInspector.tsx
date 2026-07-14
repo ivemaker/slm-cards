@@ -153,6 +153,7 @@ export const BlockInspector: React.FC<BlockInspectorProps> = ({
             isCompressing={isCompressing}
             setLocalStorageUploading={setLocalStorageUploading}
             localStorageUploading={localStorageUploading}
+            isHeaderSection={config.blocks.find(b => b.type === 'profile')?.id === focusedBlock.id}
           />
         );
       case 'socials':

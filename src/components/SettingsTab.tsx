@@ -14,7 +14,7 @@ interface SettingsTabProps {
 }
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({ lang }) => {
-  const { userRole, setUserRole } = useDev();
+  const { isAuthenticated } = useDev();
 
   return (
     <div className="flex-1 w-full p-4 sm:p-6 md:p-8 max-w-4xl mx-auto space-y-6 animate-fade-in">
@@ -61,7 +61,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ lang }) => {
                   <input 
                     type="text" 
                     readOnly 
-                    value={userRole === 'authorized' ? 'Authorized (Creator)' : 'Guest (Visitor)'} 
+                    value={isAuthenticated ? 'Authorized (Creator)' : 'Guest (Visitor)'} 
                     className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-xs text-zinc-600 focus:outline-none"
                   />
                 </div>

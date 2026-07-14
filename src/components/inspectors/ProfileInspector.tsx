@@ -14,6 +14,7 @@ interface ProfileInspectorProps {
   isCompressing: boolean;
   setLocalStorageUploading: (loading: boolean) => void;
   localStorageUploading: boolean;
+  isHeaderSection?: boolean;
 }
 
 export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
@@ -26,8 +27,11 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
   isCompressing,
   setLocalStorageUploading,
   localStorageUploading,
+  isHeaderSection = true,
 }) => {
-  const { planType } = useDev();
+  const { planType, projects, activeProjectId } = useDev();
+  const activeProject = projects.find(p => p.id === activeProjectId);
+  const projectLayout = activeProject?.layout || 'classic';
   const profile = focusedBlock.profileContent!;
 
   const handlePremiumClick = (e: React.MouseEvent) => {
@@ -799,6 +803,15 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
         <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />
         <span>{lang === 'en' ? 'Layout & Alignment' : 'РАСПОЛОЖЕНИЕ И ВЫРАВНИВАНИЕ'}</span>
       </div>
+
+      {isHeaderSection && (
+        <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/25 rounded-lg text-[10.5px] text-indigo-400 font-medium leading-normal">
+          💡 {lang === 'en' 
+            ? 'The global project layout determines the default, but you can customize layout and alignment options here.' 
+            : 'Глобальный макет проекта задает настройки по умолчанию, но вы можете переопределить их здесь.'
+          }
+        </div>
+      )}
 
       <div>
         <label className="block text-[9px] uppercase font-bold text-zinc-400 tracking-wider mb-1">{txtLayout}</label>

@@ -34,8 +34,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, lang, setLang })
     setActiveTab, 
     activeProjectId, 
     projects, 
-    userRole, 
-    setUserRole, 
+    isAuthenticated,
+    login,
+    logout,
     isSaving,
     planType,
     setPlanType
@@ -170,9 +171,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, lang, setLang })
               <span>{lang === 'en' ? 'RU' : 'EN'}</span>
             </button>
 
-            {userRole === 'authorized' ? (
+            {isAuthenticated ? (
               <button
-                onClick={() => setUserRole('guest')}
+                onClick={logout}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-950/20 text-red-400 hover:bg-red-950/40 hover:text-red-300 transition-colors text-xs font-semibold cursor-pointer"
                 title={lang === 'en' ? 'Logout' : 'Выйти'}
               >
@@ -181,7 +182,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, lang, setLang })
               </button>
             ) : (
               <button
-                onClick={() => setUserRole('authorized')}
+                onClick={login}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-950/20 text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300 transition-colors text-xs font-semibold cursor-pointer"
               >
                 <User className="w-3.5 h-3.5" />
@@ -191,7 +192,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, lang, setLang })
           </div>
 
           {/* USER PROFILE INFO */}
-          {userRole === 'authorized' && (
+          {isAuthenticated && (
             <div className="flex items-center gap-2.5 pt-2 border-t border-zinc-900/40">
               <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-[11px] font-bold text-white uppercase shrink-0">
                 US
@@ -224,7 +225,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, lang, setLang })
             >
               {lang === 'en' ? 'RU' : 'EN'}
             </button>
-            {userRole === 'authorized' && (
+            {isAuthenticated && (
               <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold">
                 US
               </div>
@@ -340,7 +341,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, lang, setLang })
                           <input 
                             type="text" 
                             readOnly 
-                            value={userRole === 'authorized' ? 'Authorized (Creator)' : 'Guest (Visitor)'} 
+                            value={isAuthenticated ? 'Authorized (Creator)' : 'Guest (Visitor)'} 
                             className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-xs text-zinc-600 focus:outline-none"
                           />
                         </div>

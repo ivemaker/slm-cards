@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { useToast } from './ToastContext';
 
-export type UserRole = 'guest' | 'authorized';
 export type PlanType = 'basic' | 'premium';
 export type TabType = 'landing' | 'projects' | 'editor' | 'dashboard' | 'preview' | 'settings';
 
@@ -10,16 +10,29 @@ export interface MockProject {
   type: 'personal_card' | 'menu' | 'catalog';
   plan: 'basic' | 'premium';
   createdAt: string;
+  avatar?: string;
+  description?: string;
+  layout: 'classic' | 'compact' | 'cover';
+  themeStyle: string;
 }
 
 export interface DevContextType {
-  userRole: UserRole;
-  setUserRole: (role: UserRole) => void;
+  isAuthenticated: boolean;
+  login: () => void;
+  logout: () => void;
   planType: PlanType;
   setPlanType: (plan: PlanType) => void;
   projects: MockProject[];
   activeProjectId: string | null;
-  createProject: (name: string, type: MockProject['type'], plan: MockProject['plan']) => void;
+  createProject: (
+    name: string,
+    type: MockProject['type'],
+    plan: MockProject['plan'],
+    avatar?: string,
+    description?: string,
+    layout?: MockProject['layout'],
+    themeStyle?: string
+  ) => void;
   deleteProject: (id: string) => void;
   setActiveProjectId: (id: string | null) => void;
   activeTab: TabType;
@@ -42,7 +55,8 @@ const getSaved = <T,>(key: string, fallback: T): T => {
 };
 
 export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [userRole, setUserRole] = useState<UserRole>(() => getSaved<UserRole>('slm_user_role', 'authorized'));
+  const toast = useToast();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => getSaved<boolean>('slm_auth_status', false));
   const [planType, setPlanTypeState] = useState<PlanType>(() => getSaved<PlanType>('slm_plan_type', 'premium'));
   const [activeTab, setActiveTab] = useState<TabType>(() => getSaved<TabType>('slm_active_tab', 'landing'));
   const [activeProjectId, setActiveProjectIdState] = useState<string | null>(() => getSaved<string | null>('slm_active_project_id', null));
@@ -55,14 +69,20 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       name: 'Моя Визитка',
       type: 'personal_card',
       plan: 'basic',
-      createdAt: new Date().toLocaleDateString('ru-RU')
+      createdAt: new Date().toLocaleDateString('ru-RU'),
+      layout: 'classic',
+      themeStyle: 'cosmic',
+      description: 'Личная интерактивная визитка'
     },
     {
       id: 'demo-menu',
       name: 'Меню Ресторана',
       type: 'menu',
       plan: 'premium',
-      createdAt: new Date().toLocaleDateString('ru-RU')
+      createdAt: new Date().toLocaleDateString('ru-RU'),
+      layout: 'compact',
+      themeStyle: 'sunset',
+      description: 'Официальное меню нашего ресторана'
     }
   ]));
 
@@ -70,12 +90,12 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   useEffect(() => {
     try {
-      localStorage.setItem('slm_user_role', JSON.stringify(userRole));
       localStorage.setItem('slm_plan_type', JSON.stringify(planType));
       localStorage.setItem('slm_active_tab', JSON.stringify(activeTab));
       localStorage.setItem('slm_active_project_id', JSON.stringify(activeProjectId));
       localStorage.setItem('slm_projects', JSON.stringify(projects));
       localStorage.setItem('slm_developer_mode', JSON.stringify(developerMode));
+      localStorage.setItem('slm_auth_status', JSON.stringify(isAuthenticated));
 
       if (firstRender.current) {
         firstRender.current = false;
@@ -87,7 +107,24 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch (e) {
       console.error("Failed to write state to localStorage", e);
     }
-  }, [userRole, planType, activeTab, activeProjectId, projects, developerMode]);
+  }, [planType, activeTab, activeProjectId, projects, developerMode, isAuthenticated]);
+
+  const login = () => {
+    setIsAuthenticated(true);
+    setActiveTab('projects');
+    localStorage.setItem('slm_auth_status', 'true');
+    localStorage.setItem('slm_active_tab', JSON.stringify('projects'));
+    toast.success('Добро пожаловать!');
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+    setActiveProjectIdState(null);
+    setActiveTab('landing');
+    localStorage.setItem('slm_auth_status', 'false');
+    localStorage.setItem('slm_active_project_id', JSON.stringify(null));
+    localStorage.setItem('slm_active_tab', JSON.stringify('landing'));
+  };
 
   const setPlanType = (newPlan: PlanType) => {
     setPlanTypeState(newPlan);
@@ -108,13 +145,25 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const createProject = (name: string, type: MockProject['type'], plan: MockProject['plan']) => {
+  const createProject = (
+    name: string,
+    type: MockProject['type'],
+    plan: MockProject['plan'],
+    avatar?: string,
+    description?: string,
+    layout: MockProject['layout'] = 'classic',
+    themeStyle: string = 'cosmic'
+  ) => {
     const newId = Math.random().toString(36).substr(2, 9);
     const newProject: MockProject = {
       id: newId,
       name,
       type,
       plan,
+      avatar,
+      description,
+      layout,
+      themeStyle,
       createdAt: new Date().toLocaleDateString('ru-RU')
     };
     setProjects(prev => [...prev, newProject]);
@@ -131,8 +180,9 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   return (
     <DevContext.Provider
       value={{
-        userRole,
-        setUserRole,
+        isAuthenticated,
+        login,
+        logout,
         planType,
         setPlanType,
         projects,

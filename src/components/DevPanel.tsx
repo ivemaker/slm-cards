@@ -3,7 +3,7 @@ import { useDev } from '../context/DevContext';
 import { useToast } from '../context/ToastContext';
 
 export const DevPanel: React.FC = () => {
-  const { userRole, setUserRole, planType, setPlanType, developerMode, setDeveloperMode } = useDev();
+  const { isAuthenticated, login, logout, planType, setPlanType, developerMode, setDeveloperMode } = useDev();
   const { success: toastSuccess, error: toastError } = useToast();
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
@@ -69,9 +69,9 @@ export const DevPanel: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setUserRole('guest')}
+                onClick={logout}
                 className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                  userRole === 'guest'
+                  !isAuthenticated
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-750 hover:text-zinc-200'
                 }`}
@@ -81,9 +81,9 @@ export const DevPanel: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setUserRole('authorized')}
+                onClick={login}
                 className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                  userRole === 'authorized'
+                  isAuthenticated
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-750 hover:text-zinc-200'
                 }`}

@@ -101,6 +101,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useDev } from './context/DevContext';
 import { SettingsTab } from './components/SettingsTab';
 import { useToast } from './context/ToastContext';
+import { AuthModal } from './components/AuthModal';
 
 import { 
   compressImage, 
@@ -718,14 +719,15 @@ export default function App() {
   }
 
   // Navigation tabs: 'landing' | 'projects' | 'editor' | 'dashboard' | 'preview'
-  const { userRole, setUserRole, planType, activeTab, setActiveTab, activeProjectId, projects, developerMode } = useDev();
+  const { isAuthenticated, login, logout, planType, activeTab, setActiveTab, activeProjectId, projects, developerMode } = useDev();
   const toast = useToast();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
-    if (userRole === 'guest' && activeTab !== 'landing') {
+    if (!isAuthenticated && activeTab !== 'landing') {
       setActiveTab('landing');
     }
-  }, [userRole, activeTab]);
+  }, [isAuthenticated, activeTab]);
   
   // Selection of template type
   const [templateType, setTemplateType] = useState<'business' | 'restaurant' | 'catalog'>('business');
@@ -743,8 +745,102 @@ export default function App() {
       }
     }
   }, [activeProjectId, projects, templateType]);
-  
+
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+
+  // Dynamically sync active project settings to the corresponding config layout
+  useEffect(() => {
+    if (activeProjectId && isDataLoaded) {
+      const activeProject = projects.find(p => p.id === activeProjectId);
+      if (activeProject) {
+        let targetType: 'business' | 'restaurant' | 'catalog' = 'business';
+        if (activeProject.type === 'menu') targetType = 'restaurant';
+        if (activeProject.type === 'catalog') targetType = 'catalog';
+
+        setConfigs(prev => {
+          const currentConfig = prev[targetType];
+          if (!currentConfig) return prev;
+
+          let modified = false;
+
+          const updatedBlocks = currentConfig.blocks.map(block => {
+            if (block.type === 'profile') {
+              const profile = block.profileContent || {};
+              const newAvatar = activeProject.avatar || profile.avatar || PLACEHOLDERS.avatarBusiness;
+              const newBio = activeProject.description || profile.bio || '';
+              
+              if (
+                profile.name !== activeProject.name ||
+                profile.avatar !== newAvatar ||
+                profile.bio !== newBio
+              ) {
+                modified = true;
+                return {
+                  ...block,
+                  profileContent: {
+                    ...profile,
+                    name: activeProject.name,
+                    avatar: newAvatar,
+                    bio: newBio,
+                  }
+                };
+              }
+            }
+            return block;
+          });
+
+          // Sync themeStyle if different
+          let updatedMainBg = { ...currentConfig.mainBg };
+          if (activeProject.themeStyle && currentConfig.mainBg?.lightConfig?.fillGradientPreset !== activeProject.themeStyle) {
+            modified = true;
+            const fillGradientPreset = activeProject.themeStyle as any;
+            
+            const presetEffects = [
+              {
+                id: 'bg-fx-1',
+                type: fillGradientPreset === 'cosmic' ? 'plasma' : fillGradientPreset === 'sunset' ? 'blob' : fillGradientPreset === 'ocean' ? 'css-waves' : fillGradientPreset === 'emerald' ? 'blob' : 'plasma',
+                complexity: 3.0,
+                intensity: 1.0,
+                isPaused: false,
+                opacity: 50,
+              }
+            ];
+
+            updatedMainBg = {
+              ...updatedMainBg,
+              lightConfig: {
+                ...updatedMainBg.lightConfig,
+                fillType: 'gradient',
+                fillGradientPreset,
+                fillGradientAnimated: true,
+                effects: presetEffects,
+              },
+              darkConfig: {
+                ...updatedMainBg.darkConfig,
+                fillType: 'gradient',
+                fillGradientPreset,
+                fillGradientAnimated: true,
+                effects: presetEffects,
+              }
+            };
+          }
+
+          if (modified) {
+            return {
+              ...prev,
+              [targetType]: {
+                ...currentConfig,
+                blocks: updatedBlocks,
+                mainBg: updatedMainBg,
+              }
+            };
+          }
+
+          return prev;
+        });
+      }
+    }
+  }, [activeProjectId, projects, isDataLoaded]);
 
   // Custom language switcher
   const [lang, setLang] = useState<'en' | 'ru'>('en');
@@ -4810,7 +4906,6 @@ export default function App() {
           <span>{toastMessage}</span>
         </div>
       )}
-
       {/* TOP BAR / THE CREATOR NAV */}
       {activeTab !== 'preview' && (
         <header id="top_bar" className="sticky top-0 z-40 bg-zinc-950 text-white border-b border-zinc-800/80">
@@ -4828,7 +4923,7 @@ export default function App() {
                 <span className="text-white font-mono font-black text-lg tracking-tighter">S</span>
               </div>
               <div>
-                <h1 className="text-sm font-black tracking-tight text-white leading-none group-hover:text-indigo-450 transition-colors">SLM Cards</h1>
+                <h1 className="text-sm font-black tracking-tight text-white leading-none group-hover:text-indigo-455 transition-colors">SLM Cards</h1>
                 <p className="text-[9px] text-zinc-500 font-mono tracking-wider uppercase mt-1 leading-none">
                   {lang === 'en' ? 'NO-CODE PLATFORM' : 'NO-CODE ПЛАТФОРМА'}
                 </p>
@@ -4836,45 +4931,47 @@ export default function App() {
             </div>
 
             {/* Center Side: Tab Switcher (My Projects and Editor) */}
-            <nav className="hidden md:flex items-center space-x-1 bg-zinc-900/60 p-1 rounded-xl border border-zinc-800/50">
-              <button
-                id="tab_projects"
-                onClick={() => {
-                  setActiveTab('projects');
-                  setIsBurgerMenuOpen(false);
-                }}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                  activeTab === 'projects' 
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-850/50'
-                }`}
-              >
-                <FolderOpen size={14} />
-                <span>{lang === 'en' ? 'My Projects' : 'Мои проекты'}</span>
-              </button>
+            {isAuthenticated && (
+              <nav className="hidden md:flex items-center space-x-1 bg-zinc-900/60 p-1 rounded-xl border border-zinc-800/50">
+                <button
+                  id="tab_projects"
+                  onClick={() => {
+                    setActiveTab('projects');
+                    setIsBurgerMenuOpen(false);
+                  }}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    activeTab === 'projects' 
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 
+                      : 'text-zinc-400 hover:text-white hover:bg-zinc-850/50'
+                  }`}
+                >
+                  <FolderOpen size={14} />
+                  <span>{lang === 'en' ? 'My Projects' : 'Мои проекты'}</span>
+                </button>
 
-              <button
-                id="tab_editor"
-                onClick={() => {
-                  setActiveTab('editor');
-                  setIsBurgerMenuOpen(false);
-                }}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                  activeTab === 'editor' 
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-850/50'
-                }`}
-              >
-                <Sliders size={14} />
-                <span>{lang === 'en' ? 'Editor' : 'Редактор'}</span>
-              </button>
-            </nav>
+                <button
+                  id="tab_editor"
+                  onClick={() => {
+                    setActiveTab('editor');
+                    setIsBurgerMenuOpen(false);
+                  }}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    activeTab === 'editor' 
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 
+                      : 'text-zinc-400 hover:text-white hover:bg-zinc-850/50'
+                  }`}
+                >
+                  <Sliders size={14} />
+                  <span>{lang === 'en' ? 'Editor' : 'Редактор'}</span>
+                </button>
+              </nav>
+            )}
 
             {/* Right Side: Language switcher, notifications, profile, and hamburger */}
             <div className="flex items-center gap-2 sm:gap-3">
               
               {/* Active Project Info Widget (Subtle badge) */}
-              {activeProjectId && (
+              {isAuthenticated && activeProjectId && (
                 <div className="hidden lg:flex items-center gap-2 bg-zinc-900/40 border border-zinc-800/60 px-3 py-1.5 rounded-lg text-xs">
                   <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
                   <span className="text-zinc-400 max-w-[120px] truncate">
@@ -4884,7 +4981,7 @@ export default function App() {
               )}
 
               {/* 👁️ PUBLIC PREVIEW BUTTON (Highly Prominent!) */}
-              {activeProjectId && (
+              {isAuthenticated && activeProjectId && (
                 <button
                   onClick={() => {
                     setActiveTab('preview');
@@ -4901,7 +4998,7 @@ export default function App() {
               )}
 
               {/* Notification bell */}
-              {userRole === 'authorized' && (
+              {isAuthenticated && (
                 <div className="relative">
                   <button 
                     onClick={() => {
@@ -4951,12 +5048,11 @@ export default function App() {
               </button>
 
               {/* Profile card / Login button */}
-              {userRole === 'guest' ? (
+              {!isAuthenticated ? (
                 <div className="hidden sm:flex items-center gap-1.5">
                   <button 
                     onClick={() => {
-                      setUserRole('authorized');
-                      setActiveTab('projects');
+                      setIsAuthModalOpen(true);
                     }}
                     className="text-xs font-bold px-3 py-1.5 text-zinc-400 hover:text-white transition-colors cursor-pointer"
                   >
@@ -4964,8 +5060,7 @@ export default function App() {
                   </button>
                   <button 
                     onClick={() => {
-                      setUserRole('authorized');
-                      setActiveTab('projects');
+                      setIsAuthModalOpen(true);
                     }}
                     className="text-xs font-bold px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors shadow-lg shadow-indigo-600/10 cursor-pointer"
                   >
@@ -4981,8 +5076,7 @@ export default function App() {
                     <span className="text-[10px] font-bold text-zinc-200">ivemaker</span>
                     <button 
                       onClick={() => {
-                        setUserRole('guest');
-                        setActiveTab('landing');
+                        logout();
                       }}
                       className="text-[9px] font-semibold text-zinc-500 hover:text-rose-450 text-left cursor-pointer transition-colors mt-0.5 leading-none"
                     >
@@ -5016,46 +5110,48 @@ export default function App() {
                       className="absolute right-0 mt-2 w-64 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 p-1.5 flex flex-col gap-0.5"
                     >
                       {/* Navigation links for MOBILE/TABLET (since they are hidden in center on small screens) */}
-                      <div className="md:hidden flex flex-col gap-0.5">
-                        <div className="px-3 py-1.5 text-[9px] text-zinc-500 uppercase tracking-wider font-bold">
-                          {lang === 'en' ? 'Workspace' : 'Рабочая область'}
-                        </div>
-                        
-                        <button
-                          onClick={() => {
-                            setActiveTab('projects');
-                            setIsBurgerMenuOpen(false);
-                          }}
-                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left cursor-pointer ${
-                            activeTab === 'projects' ? 'bg-indigo-600 text-white' : 'text-zinc-300 hover:bg-zinc-800'
-                          }`}
-                        >
-                          <FolderOpen size={14} className="shrink-0" />
-                          <span>{lang === 'en' ? 'My Projects' : 'Мои проекты'}</span>
-                        </button>
+                      {isAuthenticated && (
+                        <div className="md:hidden flex flex-col gap-0.5">
+                          <div className="px-3 py-1.5 text-[9px] text-zinc-500 uppercase tracking-wider font-bold">
+                            {lang === 'en' ? 'Workspace' : 'Рабочая область'}
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              setActiveTab('projects');
+                              setIsBurgerMenuOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left cursor-pointer ${
+                              activeTab === 'projects' ? 'bg-indigo-600 text-white' : 'text-zinc-300 hover:bg-zinc-800'
+                            }`}
+                          >
+                            <FolderOpen size={14} className="shrink-0" />
+                            <span>{lang === 'en' ? 'My Projects' : 'Мои проекты'}</span>
+                          </button>
 
-                        <button
-                          onClick={() => {
-                            setActiveTab('editor');
-                            setIsBurgerMenuOpen(false);
-                          }}
-                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left cursor-pointer ${
-                            activeTab === 'editor' ? 'bg-indigo-600 text-white' : 'text-zinc-300 hover:bg-zinc-800'
-                          }`}
-                        >
-                          <Sliders size={14} className="shrink-0" />
-                          <span>{lang === 'en' ? 'Editor' : 'Редактор'}</span>
-                        </button>
-                        
-                        <div className="h-px bg-zinc-800/60 my-1" />
-                      </div>
+                          <button
+                            onClick={() => {
+                              setActiveTab('editor');
+                              setIsBurgerMenuOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left cursor-pointer ${
+                              activeTab === 'editor' ? 'bg-indigo-600 text-white' : 'text-zinc-300 hover:bg-zinc-800'
+                            }`}
+                          >
+                            <Sliders size={14} className="shrink-0" />
+                            <span>{lang === 'en' ? 'Editor' : 'Редактор'}</span>
+                          </button>
+                          
+                          <div className="h-px bg-zinc-800/60 my-1" />
+                        </div>
+                      )}
 
                       {/* Management section */}
                       <div className="px-3 py-1.5 text-[9px] text-zinc-500 uppercase tracking-wider font-bold">
                         {lang === 'en' ? 'Management' : 'Управление'}
                       </div>
 
-                      {userRole === 'authorized' ? (
+                      {isAuthenticated ? (
                         <>
                           <button
                             onClick={() => {
@@ -5096,7 +5192,7 @@ export default function App() {
                         {lang === 'en' ? 'Account Profile' : 'Профиль аккаунта'}
                       </div>
 
-                      {userRole === 'authorized' ? (
+                      {isAuthenticated ? (
                         <div className="p-1 flex flex-col gap-1">
                           <div className="flex items-center gap-2 px-2 py-1.5 bg-zinc-950/30 rounded-lg border border-zinc-800/40">
                             <div className="w-6 h-6 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-[10px] uppercase shrink-0">
@@ -5112,13 +5208,12 @@ export default function App() {
                           
                           <button
                             onClick={() => {
-                              setUserRole('guest');
-                              setActiveTab('landing');
+                              logout();
                               setIsBurgerMenuOpen(false);
                             }}
                             className="w-full mt-1 px-3 py-2 bg-rose-950/20 hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 transition-colors text-left text-xs font-bold rounded-lg flex items-center gap-2.5 cursor-pointer"
                           >
-                            <LogOut size={13} className="shrink-0 text-rose-450" />
+                            <LogOut size={13} className="shrink-0 text-rose-455" />
                             <span>{lang === 'en' ? 'Sign Out / Exit' : 'Выйти из аккаунта'}</span>
                           </button>
                         </div>
@@ -5126,8 +5221,7 @@ export default function App() {
                         <div className="p-1">
                           <button
                             onClick={() => {
-                              setUserRole('authorized');
-                              setActiveTab('projects');
+                              setIsAuthModalOpen(true);
                               setIsBurgerMenuOpen(false);
                             }}
                             className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition-colors text-center cursor-pointer flex items-center justify-center gap-2"
@@ -5152,7 +5246,7 @@ export default function App() {
           <main className="flex-1 flex flex-col relative bg-zinc-50">
 
         {/* 1. THE CREATOR WORKSPACE (EDITOR TAB) */}
-        {activeTab === 'editor' && activeProjectId === null ? (
+        {isAuthenticated && activeTab === 'editor' && activeProjectId === null ? (
           <div className="flex-1 w-full flex flex-col items-center justify-center p-8 bg-zinc-950 text-center animate-fade-in min-h-[70vh]">
             <div className="max-w-md bg-zinc-900 border border-zinc-850 p-8 rounded-2xl shadow-2xl flex flex-col items-center space-y-6">
               <div className="w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-lg">
@@ -5178,7 +5272,7 @@ export default function App() {
               </button>
             </div>
           </div>
-        ) : activeTab === 'editor' && (
+        ) : isAuthenticated && activeTab === 'editor' && (
           <div className="w-full flex flex-col items-stretch justify-center relative h-[calc(100vh-56px)] overflow-hidden">
             
             {/* LAYERS DRAWER BACKDROP OVERLAY */}
@@ -5652,7 +5746,7 @@ export default function App() {
 
 
         {/* LANDING TAB */}
-        {activeTab === 'landing' && (
+        {(!isAuthenticated || activeTab === 'landing') && (
           <div className="flex-1 w-full bg-zinc-950 flex flex-col items-center justify-start py-12 sm:py-20 px-4 sm:px-6 md:px-8 text-center animate-fade-in relative overflow-hidden min-h-[calc(100vh-64px)] z-0">
             {/* Ambient Background Glows */}
             <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
@@ -5683,10 +5777,11 @@ export default function App() {
               <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-md justify-center">
                 <button
                   onClick={() => {
-                    if (userRole === 'guest') {
-                      setUserRole('authorized');
+                    if (!isAuthenticated) {
+                      setIsAuthModalOpen(true);
+                    } else {
+                      setActiveTab('projects');
                     }
-                    setActiveTab('projects');
                   }}
                   className="w-full sm:w-auto px-8 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/25 transition-all active:scale-98 cursor-pointer border border-indigo-500 flex items-center justify-center gap-2"
                 >
@@ -5695,10 +5790,11 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => {
-                    if (userRole === 'guest') {
-                      setUserRole('authorized');
+                    if (!isAuthenticated) {
+                      setIsAuthModalOpen(true);
+                    } else {
+                      setActiveTab('editor');
                     }
-                    setActiveTab('editor');
                   }}
                   className="w-full sm:w-auto px-8 py-3.5 bg-zinc-900 hover:bg-zinc-850 text-zinc-300 hover:text-white font-bold text-sm rounded-xl transition-all active:scale-98 cursor-pointer border border-zinc-800 flex items-center justify-center gap-2"
                 >
@@ -5755,17 +5851,17 @@ export default function App() {
         )}
 
         {/* PROJECTS TAB */}
-        {activeTab === 'projects' && (
+        {isAuthenticated && activeTab === 'projects' && (
           <ProjectsTab lang={lang} />
         )}
 
         {/* DASHBOARD TAB */}
-        {activeTab === 'dashboard' && (
+        {isAuthenticated && activeTab === 'dashboard' && (
           <DashboardTab lang={lang} />
         )}
 
         {/* SETTINGS TAB */}
-        {activeTab === 'settings' && (
+        {isAuthenticated && activeTab === 'settings' && (
           <SettingsTab lang={lang} />
         )}
           </main>
@@ -6497,6 +6593,7 @@ export default function App() {
       )}
 
       <GlobalGlassFilters blocks={config.blocks} />
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} lang={lang} />
     </div>
   );
 }

@@ -8,11 +8,11 @@ import { DevPanel } from './components/DevPanel';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <DevProvider>
-      <ToastProvider>
+    <ToastProvider>
+      <DevProvider>
         <App />
         <DevPanel />
-      </ToastProvider>
-    </DevProvider>
+      </DevProvider>
+    </ToastProvider>
   </StrictMode>,
 );
