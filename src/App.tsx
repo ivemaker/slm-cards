@@ -3373,6 +3373,81 @@ export default function App() {
     showToast(lang === 'en' ? `Added ${item.title} to Cart` : `${item.title} добавлен в корзину`);
   };
 
+  const renderCartUI = (isMockup = false) => {
+    if (cart.length === 0) return null;
+    const isDarkAppTheme = config.mainBg?.theme === 'dark';
+
+    return (
+      <>
+        {/* Floating Cart Badge */}
+        {!isCartOpen && (
+          <button
+            id="floating_cart_badge"
+            onClick={() => setIsCartOpen(true)}
+            className={`${isMockup ? 'absolute' : 'fixed'} top-4 right-4 z-[100] p-2 drop-shadow-md hover:scale-110 transition-transform active:scale-95 duration-200 animate-fade-in`}
+          >
+            <div className={`relative flex items-center justify-center ${isDarkAppTheme ? 'text-white' : 'text-zinc-900'}`}>
+              <ShoppingBag size={26} strokeWidth={1.5} />
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center shadow-sm">
+                {cart.reduce((s, c) => s + c.quantity, 0)}
+              </span>
+            </div>
+          </button>
+        )}
+
+        {/* Cart Drawer */}
+        {isCartOpen && (
+          <div className={`${isMockup ? 'absolute' : 'fixed'} inset-0 z-[110] bg-black/60 backdrop-blur-xs flex items-end justify-center p-0 sm:p-4 animate-fade-in`} onClick={() => setIsCartOpen(false)}>
+            <div 
+              className={`bg-white w-full ${isMockup ? '' : 'sm:max-w-md'} p-6 sm:rounded-2xl rounded-t-2xl shadow-2xl space-y-4 animate-slide-up ${isMockup ? 'max-h-[78%]' : 'max-h-[85%]'} flex flex-col`} 
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-zinc-100 pb-3 shrink-0">
+                <h3 className="font-bold text-sm tracking-tight text-zinc-900 flex items-center gap-1.5">
+                  <ShoppingBag size={15} className="text-zinc-500" />
+                  <span>{TRANSLATIONS[lang].cartTitle}</span>
+                </h3>
+                <button onClick={() => setIsCartOpen(false)} className="text-[10px] text-zinc-400 hover:text-zinc-900 transition-colors uppercase font-mono font-bold tracking-widest px-1.5">Close ✕</button>
+              </div>
+              
+              <div className="space-y-3 overflow-y-auto pr-1 flex-1 min-h-0 scrollbar-thin">
+                {cart.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between gap-4 py-1.5 border-b border-zinc-50">
+                    {item.image && <img src={item.image} alt={item.title} className="w-10 h-10 rounded object-cover flex-shrink-0 bg-zinc-50" />}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-xs text-zinc-900 truncate">{item.title}</h4>
+                      <span className="text-[10px] text-zinc-500 font-mono">{formatPrice(item.price, lang)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => handleUpdateCartQty(item.id, item.quantity - 1)} className="w-5 h-5 bg-zinc-100 hover:bg-zinc-200 rounded text-center text-xs font-bold flex items-center justify-center">-</button>
+                      <span className="font-mono text-xs text-zinc-900 font-bold min-w-[12px] text-center">{item.quantity}</span>
+                      <button onClick={() => handleUpdateCartQty(item.id, item.quantity + 1)} className="w-5 h-5 bg-zinc-100 hover:bg-zinc-200 rounded text-center text-xs font-bold flex items-center justify-center">+</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-zinc-100 pt-3 space-y-3 shrink-0">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-xs font-medium text-zinc-500">Order Subtotal:</span>
+                  <span className="text-sm font-mono font-bold text-zinc-900">{formatPrice(cart.reduce((s, c) => s + (c.price * c.quantity), 0), lang)}</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <button onClick={() => handleCartCheckout('whatsapp')} className="w-full py-2.5 bg-green-500 hover:bg-green-600 text-white font-bold text-xs rounded transition duration-200 shadow-lg active:scale-98">
+                    {lang === 'en' ? 'Order via WhatsApp' : 'Заказать в WhatsApp'}
+                  </button>
+                  <button onClick={() => handleCartCheckout('telegram')} className="w-full py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded transition duration-200 shadow-lg active:scale-98">
+                    {lang === 'en' ? 'Order via Telegram' : 'Заказать в Telegram'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
   const handleRemoveFromCart = (id: string) => {
     setCart(cart.filter(i => i.id !== id));
   };
@@ -3386,7 +3461,7 @@ export default function App() {
   };
 
   // Cart compile and message direct checkout redirect
-  const handleCartCheckout = () => {
+  const handleCartCheckout = (platform: 'whatsapp' | 'telegram') => {
     if (cart.length === 0) return;
     
     // Increment conversions
@@ -3409,14 +3484,17 @@ export default function App() {
       ? `*Total sum:* ${formatPrice(totalSum, lang)}\n\nThank you!`
       : `*Итого к оплате:* ${formatPrice(totalSum, lang)}\n\nСпасибо!`;
 
-    // Calculate WhatsApp or Telegram URLs
-    let destinationUrl = '';
-    const destVal = config.orderDestinationValue.trim();
+    // Get active project contacts
+    const activeProject = projects.find(p => p.id === activeProjectId);
+    const whatsappPhone = activeProject?.whatsappPhone || '+1234567890';
+    const telegramUsername = activeProject?.telegramUsername || 'mybrand';
 
-    if (config.orderDestinationType === 'whatsapp') {
-      destinationUrl = generateWhatsAppLink(destVal || '+1234567890', message);
+    let destinationUrl = '';
+
+    if (platform === 'whatsapp') {
+      destinationUrl = generateWhatsAppLink(whatsappPhone, message);
     } else {
-      destinationUrl = generateTelegramLink(destVal || 'mybrand', message);
+      destinationUrl = generateTelegramLink(telegramUsername, message);
     }
 
     // Attempt direct redirect or target blank reference to guarantee working preview
@@ -3491,6 +3569,9 @@ export default function App() {
       : config.theme === 'mono' 
         ? 'font-mono' 
         : 'font-sans';
+
+    const currentTheme = config.mainBg?.syncThemes ? 'light' : (config.mainBg?.theme || 'light');
+    const isDarkAppTheme = currentTheme === 'dark';
 
     const renderSingleBlock = (block: Block, isInsideRowGroup: boolean = false): React.JSX.Element => {
       const currentTheme = config.mainBg?.syncThemes ? 'light' : (config.mainBg?.theme || 'light');
@@ -4320,27 +4401,57 @@ export default function App() {
 
           {block.type === 'button' && block.buttonContent && (
             <div className="w-full" style={{ textAlign: block.textAlign || 'center' }}>
-              <a
-                href={isPreviewMockupMode ? undefined : block.buttonContent.url}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
-                  ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
-                  ...(block.customTitleFontSize ? { fontSize: `${block.customTitleFontSize}px` } : {}),
-                  ...getTextStyles(block, false)
-                }}
-                className={`
-                  inline-block w-full py-2.5 px-4 font-medium text-xs tracking-tight transition-transform active:scale-[0.98]
-                  ${(block.titleTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''}
-                  ${radiusClass}
-                  ${block.buttonContent.variant === 'primary' ? 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-md' : ''}
-                  ${block.buttonContent.variant === 'secondary' ? 'border border-zinc-200 text-zinc-900 hover:bg-zinc-50' : ''}
-                  ${block.buttonContent.variant === 'outline' ? 'border border-zinc-900 text-zinc-900 hover:bg-zinc-900 hover:text-white' : ''}
-                `}
-              >
-                {block.buttonContent.label}
-              </a>
+              {block.config?.isEcomEnabled ? (
+                <button
+                  onClick={(e) => {
+                    if (isPreviewMockupMode) return;
+                    e.stopPropagation();
+                    handleAddToCart({
+                      id: block.id,
+                      title: block.buttonContent!.label,
+                      price: block.config?.price || 0,
+                    });
+                  }}
+                  style={{
+                    ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
+                    ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
+                    ...(block.customTitleFontSize ? { fontSize: `${block.customTitleFontSize}px` } : {}),
+                    ...getTextStyles(block, false)
+                  }}
+                  className={`
+                    inline-block w-full py-2.5 px-4 font-medium text-xs tracking-tight transition-transform active:scale-[0.98]
+                    ${(block.titleTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''}
+                    ${radiusClass}
+                    ${block.buttonContent.variant === 'primary' ? 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-md' : ''}
+                    ${block.buttonContent.variant === 'secondary' ? 'border border-zinc-200 text-zinc-900 hover:bg-zinc-50' : ''}
+                    ${block.buttonContent.variant === 'outline' ? 'border border-zinc-900 text-zinc-900 hover:bg-zinc-900 hover:text-white' : ''}
+                  `}
+                >
+                  {block.buttonContent.label}
+                </button>
+              ) : (
+                <a
+                  href={isPreviewMockupMode ? undefined : block.buttonContent.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
+                    ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
+                    ...(block.customTitleFontSize ? { fontSize: `${block.customTitleFontSize}px` } : {}),
+                    ...getTextStyles(block, false)
+                  }}
+                  className={`
+                    inline-block w-full py-2.5 px-4 font-medium text-xs tracking-tight transition-transform active:scale-[0.98]
+                    ${(block.titleTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''}
+                    ${radiusClass}
+                    ${block.buttonContent.variant === 'primary' ? 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-md' : ''}
+                    ${block.buttonContent.variant === 'secondary' ? 'border border-zinc-200 text-zinc-900 hover:bg-zinc-50' : ''}
+                    ${block.buttonContent.variant === 'outline' ? 'border border-zinc-900 text-zinc-900 hover:bg-zinc-900 hover:text-white' : ''}
+                  `}
+                >
+                  {block.buttonContent.label}
+                </a>
+              )}
             </div>
           )}
 
@@ -4398,7 +4509,7 @@ export default function App() {
                       if (isPreviewMockupMode) return; // ignore in active editor mockup clicks
                       e.stopPropagation();
                       handleAddToCart({
-                        id: block.catalogItemContent!.id,
+                        id: block.id,
                         title: block.catalogItemContent!.title,
                         price: block.catalogItemContent!.price,
                         image: block.catalogItemContent!.image,
@@ -4552,7 +4663,7 @@ export default function App() {
 
     return (
       <div 
-        className={`flex flex-col ${fontClass} text-zinc-900 transition-all duration-300 w-full ${containerWidthClass} mx-auto`}
+        className={`flex flex-col ${fontClass} text-zinc-900 transition-all duration-300 w-full ${containerWidthClass} mx-auto relative min-h-full flex-1`}
         style={{ gap: `${blockSpacingPx}px` }}
       >
         {config.blocks.map((block) => renderSingleBlock(block))}
@@ -5344,7 +5455,7 @@ export default function App() {
               const isDarkText = bgInfo.className.includes('text-white');
               const textColorClass = isDarkText ? 'text-white' : 'text-zinc-900';
 
-              const outerClassName = `flex-1 w-full min-h-[75vh] relative overflow-hidden flex flex-col transition-all duration-300 ${bgInfo.className} ${textColorClass}`;
+              const outerClassName = `flex-1 w-full min-h-[75vh] relative overflow-hidden flex flex-col transition-all duration-300 transform translate-x-0 ${bgInfo.className} ${textColorClass}`;
               const outerStyle = bgInfo.style;
 
               const innerClassName = `w-full h-full py-10 px-4 overflow-y-auto overflow-x-hidden relative flex flex-col items-center z-10 font-[system-ui] transition-all duration-500 ${viewMode === 'mobile' ? 'max-w-[375px] mx-auto shadow-[0_0_50px_rgba(0,0,0,0.3)]' : 'max-w-[720px] mx-auto'}`;
@@ -5379,6 +5490,8 @@ export default function App() {
                       </footer>
                     </div>
                   </div>
+
+                  {!showMockup && renderCartUI()}
 
                   {/* SELECTED FRAME INSPECTOR POPUP MODAL */}
                   {selectedBlockId && (() => {
@@ -5609,7 +5722,7 @@ export default function App() {
                           const isDarkText = editorBgInfo.className.includes('text-white');
                           const textColorClass = isDarkText ? 'text-white' : 'text-zinc-900';
 
-                          const outerClassName = `w-full h-full rounded-[38px] relative overflow-hidden select-none isolate ${editorBgInfo.className} ${textColorClass}`;
+                          const outerClassName = `w-full h-full rounded-[38px] relative overflow-hidden select-none isolate transform translate-x-0 ${editorBgInfo.className} ${textColorClass}`;
                           const outerStyle = editorBgInfo.style;
 
                           const innerClassName = `absolute inset-0 overflow-y-auto overflow-x-hidden scrollbar-none w-full h-full py-8 px-4 flex flex-col items-center z-10 font-[system-ui] transition-all duration-500`;
@@ -5632,6 +5745,7 @@ export default function App() {
                                   {renderPublicBlocks(false)}
                                 </div>
                               </div>
+                              {renderCartUI(true)}
                             </div>
                           );
                         })()}
@@ -5686,7 +5800,7 @@ export default function App() {
                             const isDarkText = editorBgInfo.className.includes('text-white');
                             const textColorClass = isDarkText ? 'text-white' : 'text-zinc-900';
 
-                            const outerClassName = `w-full h-full rounded-[22px] relative overflow-hidden select-none isolate ${editorBgInfo.className} ${textColorClass}`;
+                            const outerClassName = `w-full h-full rounded-[22px] relative overflow-hidden select-none isolate transform translate-x-0 ${editorBgInfo.className} ${textColorClass}`;
                             const outerStyle = editorBgInfo.style;
 
                             const innerClassName = `absolute inset-0 overflow-y-auto overflow-x-hidden scrollbar-none w-full h-full py-8 px-4 flex flex-col items-center z-10 font-[system-ui] transition-all duration-500`;
@@ -5709,6 +5823,7 @@ export default function App() {
                                     {renderPublicBlocks(false)}
                                   </div>
                                 </div>
+                                {renderCartUI(true)}
                               </div>
                             );
                           })()}
@@ -5958,6 +6073,8 @@ export default function App() {
                   {/* Output Frame elements strictly block configured */}
                   {renderPublicBlocks(false)}
 
+                  {renderCartUI()}
+
                   {/* Static tiny trademark footer */}
                   <footer className={`mt-14 text-center border-t pt-6 text-[10px] font-mono tracking-wider w-full ${
                     isDarkTheme ? 'border-zinc-800/50 text-zinc-500' : 'border-zinc-200 text-zinc-400'
@@ -6064,67 +6181,10 @@ export default function App() {
                   </div>
                 )}
               </AnimatePresence>
-
-              {/* VISITOR SHOPPING CART DRAWER (PREVIEW ONLY) */}
-                {cart.length > 0 && !isCartOpen && (
-                  <button
-                    id="floating_cart_badge"
-                    onClick={() => setIsCartOpen(true)}
-                    className="fixed bottom-6 right-6 z-40 px-5 py-3.5 bg-zinc-950 text-white font-medium text-xs rounded-full shadow-2xl flex items-center gap-2 border border-zinc-800 hover:scale-105 transition active:scale-95 duration-200 animate-slide-up"
-                  >
-                    <div className="relative">
-                      <ShoppingBag size={15} />
-                      <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-emerald-500 text-white rounded-full text-[8px] font-bold flex items-center justify-center shadow-inner">
-                        {cart.reduce((s, c) => s + c.quantity, 0)}
-                      </span>
-                    </div>
-                    <span>
-                      {TRANSLATIONS[lang].cartTitle} ({formatPrice(cart.reduce((s, c) => s + (c.price * c.quantity), 0), lang)})
-                    </span>
-                    <ChevronRight size={13} className="opacity-60" />
-                  </button>
-                )}
-
-                {isCartOpen && (
-                  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in" onClick={() => setIsCartOpen(false)}>
-                    <div className="bg-white rounded-xl w-full max-w-md p-6 border border-zinc-200 shadow-2xl space-y-4 animate-scale-up" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
-                        <h3 className="font-bold text-sm tracking-tight text-zinc-900 flex items-center gap-1.5">
-                          <ShoppingBag size={15} className="text-zinc-500" />
-                          <span>{TRANSLATIONS[lang].cartTitle}</span>
-                        </h3>
-                        <button onClick={() => setIsCartOpen(false)} className="text-[10px] text-zinc-400 hover:text-zinc-900 transition-colors uppercase font-mono font-bold tracking-widest px-1.5">Close ✕</button>
-                      </div>
-                      <div className="space-y-3 max-h-[260px] overflow-y-auto pr-1">
-                        {cart.map((item) => (
-                          <div key={item.id} className="flex items-center justify-between gap-4 py-1.5 border-b border-zinc-50">
-                            {item.image && <img src={item.image} alt={item.title} className="w-10 h-10 rounded object-cover flex-shrink-0 bg-zinc-50" />}
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-xs text-zinc-900 truncate">{item.title}</h4>
-                              <span className="text-[10px] text-zinc-500 font-mono">{formatPrice(item.price, lang)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button onClick={() => handleUpdateCartQty(item.id, item.quantity - 1)} className="w-5 h-5 bg-zinc-100 hover:bg-zinc-200 rounded text-center text-xs font-bold flex items-center justify-center">-</button>
-                              <span className="font-mono text-xs text-zinc-900 font-bold min-w-[12px] text-center">{item.quantity}</span>
-                              <button onClick={() => handleUpdateCartQty(item.id, item.quantity + 1)} className="w-5 h-5 bg-zinc-100 hover:bg-zinc-200 rounded text-center text-xs font-bold flex items-center justify-center">+</button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="border-t border-zinc-100 pt-3 space-y-3">
-                        <div className="flex justify-between items-baseline">
-                          <span className="text-xs font-medium text-zinc-500">Order Subtotal:</span>
-                          <span className="text-sm font-mono font-bold text-zinc-900">{formatPrice(cart.reduce((s, c) => s + (c.price * c.quantity), 0), lang)}</span>
-                        </div>
-                        <div className="bg-zinc-50 p-2 rounded text-[10px] text-zinc-400 font-mono">Orders are formatted securely and transferred directly.</div>
-                        <button onClick={handleCartCheckout} className="w-full py-2.5 bg-zinc-950 text-white font-bold text-xs rounded transition duration-200 shadow-lg active:scale-98">{TRANSLATIONS[lang].checkoutBtn}</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
             </div>
           );
         })()}
+
 
 
 
@@ -6593,6 +6653,7 @@ export default function App() {
       )}
 
       <GlobalGlassFilters blocks={config.blocks} />
+
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} lang={lang} />
     </div>
   );

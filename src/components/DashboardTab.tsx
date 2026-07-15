@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { useDev } from '../context/DevContext';
+import { useToast } from '../context/ToastContext';
 import {
   TrendingUp,
   Smartphone,
@@ -19,7 +20,10 @@ import {
   User,
   ArrowUpRight,
   QrCode,
-  Download
+  Download,
+  Copy,
+  ExternalLink,
+  Loader2
 } from 'lucide-react';
 
 interface DashboardTabProps {
@@ -33,7 +37,49 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ lang }) => {
     setActiveTab
   } = useDev();
 
+  const { success: toastSuccess, error: toastError } = useToast();
+  const [isQrLoading, setIsQrLoading] = React.useState(true);
+
   const activeProject = projects.find(p => p.id === activeProjectId);
+
+  React.useEffect(() => {
+    setIsQrLoading(true);
+  }, [activeProject?.id, activeProject?.type]);
+
+  const typeMap: Record<string, string> = {
+    personal_card: 'card',
+    menu: 'menu',
+    catalog: 'catalog'
+  };
+  const pathPrefix = activeProject ? (typeMap[activeProject.type] || 'card') : 'card';
+  const projectUrl = activeProject ? `https://slm.cards/${pathPrefix}/${activeProject.id}` : '';
+
+  const qrColor = '6366f1'; 
+  const qrBgColor = '1e1b4b'; 
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(projectUrl)}&color=${qrColor}&bgcolor=${qrBgColor}`;
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(projectUrl)
+      .then(() => toastSuccess(lang === 'en' ? 'Link copied to clipboard!' : 'Ссылка скопирована!'))
+      .catch(() => toastError(lang === 'en' ? 'Failed to copy' : 'Ошибка копирования'));
+  };
+
+  const handleDownloadQr = async () => {
+    try {
+      const response = await fetch(qrSrc);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `slm-qr-${activeProject?.id || 'code'}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      toastError(lang === 'en' ? 'Failed to download QR code' : 'Ошибка при скачивании QR-кода');
+    }
+  };
 
   // STEP 2: Placeholder if no active project
   if (!activeProjectId || !activeProject) {
@@ -516,43 +562,94 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ lang }) => {
         </div>
 
         {/* Dynamic QR Code & Links section as secondary stats details */}
-        <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="space-y-2 max-w-md">
-            <h3 className="text-base font-bold text-zinc-900 flex items-center gap-1.5">
-              <QrCode className="w-5 h-5 text-indigo-600" />
-              {lang === 'en' ? 'Interactive Project QR Code' : 'QR-код для визиток и рекламы'}
-            </h3>
-            <p className="text-xs text-zinc-550 leading-relaxed">
-              {lang === 'en' 
-                ? 'Print your custom vector QR code to place on physical cards, table stands, stickers, or catalogs for immediate scanning.' 
-                : 'Размещайте этот QR-код на меню ресторана, столах, фирменных наклейках или бумажных буклетах для быстрого сканирования.'}
-            </p>
-          </div>
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
+          
+          {/* Subtle background decoration */}
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none" />
 
-          <div className="flex items-center gap-4 shrink-0">
-            <div className="w-24 h-24 bg-zinc-50 border border-zinc-200 rounded-xl p-2 flex items-center justify-center shadow-inner">
-              {/* Dummy styled grid lines mimicking QR */}
-              <div className="w-full h-full border-2 border-zinc-900 rounded p-1 flex flex-wrap gap-1 bg-white">
-                <div className="w-5 h-5 bg-zinc-900 rounded-sm" />
-                <div className="w-5 h-5 bg-transparent" />
-                <div className="w-5 h-5 bg-zinc-900 rounded-sm" />
-                <div className="w-5 h-5 bg-transparent" />
-                <div className="w-5 h-5 bg-zinc-900 rounded-sm" />
-                <div className="w-5 h-5 bg-zinc-900 rounded-sm" />
-                <div className="w-5 h-5 bg-zinc-900 rounded-sm" />
-                <div className="w-5 h-5 bg-transparent" />
-                <div className="w-5 h-5 bg-zinc-900 rounded-sm" />
-              </div>
+          {/* Left: Info & Link */}
+          <div className="space-y-6 flex-1 w-full relative z-10">
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <QrCode className="w-5 h-5 text-indigo-500" />
+                {lang === 'en' ? 'Publish & Share' : 'Публикация проекта'}
+              </h3>
+              <p className="text-sm text-zinc-400 leading-relaxed max-w-md">
+                {lang === 'en' 
+                  ? 'Your project is live! Share this unique link with your audience or print the QR code for physical locations.' 
+                  : 'Проект опубликован! Делитесь этой ссылкой с аудиторией или используйте QR-код для печатной продукции.'}
+              </p>
             </div>
 
-            <div className="space-y-2">
-              <button className="w-full px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow cursor-pointer">
-                <Download className="w-3.5 h-3.5" />
-                {lang === 'en' ? 'Download Vector' : 'Скачать векторный'}
-              </button>
-              <button className="w-full px-3.5 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 border border-zinc-200 cursor-pointer">
-                <Download className="w-3.5 h-3.5" />
-                {lang === 'en' ? 'Print Label' : 'Печать наклейки'}
+            {/* Read-only URL field with Copy button */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider pl-1">
+                {lang === 'en' ? 'Direct Link' : 'Прямая ссылка'}
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center shadow-inner">
+                  <input 
+                    type="text" 
+                    readOnly 
+                    value={projectUrl}
+                    className="bg-transparent border-none outline-none text-sm text-zinc-200 font-mono w-full truncate selection:bg-indigo-500/30"
+                  />
+                </div>
+                <button 
+                  onClick={handleCopyLink}
+                  title={lang === 'en' ? 'Copy link' : 'Скопировать ссылку'}
+                  className="shrink-0 p-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-600 rounded-xl text-zinc-300 transition-all cursor-pointer group"
+                >
+                  <Copy className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                </button>
+                <a 
+                  href={projectUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={lang === 'en' ? 'Open in new tab' : 'Открыть в новой вкладке'}
+                  className="shrink-0 p-3 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 hover:border-indigo-400 rounded-xl text-white transition-all cursor-pointer group shadow-lg shadow-indigo-600/20"
+                >
+                  <ExternalLink className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: QR Code Visual & Download */}
+          <div className="shrink-0 flex flex-col sm:flex-row items-center gap-6 bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-2xl relative z-10 w-full md:w-auto">
+            {/* QR Code Canvas/Loader */}
+            <div className="w-36 h-36 rounded-xl bg-zinc-950 border border-white/10 flex items-center justify-center p-2 shadow-inner relative overflow-hidden">
+              {isQrLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-950 z-10">
+                  <div className="w-full h-full bg-zinc-800 animate-pulse" />
+                  <Loader2 className="absolute w-6 h-6 text-indigo-500 animate-spin" />
+                </div>
+              )}
+              <img 
+                src={qrSrc} 
+                alt="Project QR Code" 
+                className={`w-full h-full object-contain rounded-lg transition-opacity duration-500 ${isQrLoading ? 'opacity-0' : 'opacity-100'}`}
+                onLoad={() => setIsQrLoading(false)}
+                onError={() => setIsQrLoading(false)}
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col gap-3 w-full sm:w-auto">
+              <div className="text-center sm:text-left space-y-0.5">
+                <span className="block text-sm font-bold text-zinc-200">
+                  {lang === 'en' ? 'Smart QR Code' : 'Умный QR-код'}
+                </span>
+                <span className="block text-xs text-zinc-500">
+                  {lang === 'en' ? 'High-res • Indigo' : 'Высокое качество'}
+                </span>
+              </div>
+              <button 
+                onClick={handleDownloadQr}
+                className="w-full sm:w-auto px-5 py-2.5 bg-zinc-100 hover:bg-white text-zinc-900 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95"
+              >
+                <Download className="w-4 h-4" />
+                {lang === 'en' ? 'Download QR' : 'Скачать QR'}
               </button>
             </div>
           </div>

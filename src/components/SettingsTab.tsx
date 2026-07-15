@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDev } from '../context/DevContext';
 import { 
   Settings as SettingsIcon, 
@@ -6,15 +6,38 @@ import {
   Shield, 
   HelpCircle,
   Check,
-  Loader2
+  Loader2,
+  ShoppingCart
 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 interface SettingsTabProps {
   lang: 'en' | 'ru';
 }
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({ lang }) => {
-  const { isAuthenticated } = useDev();
+  const { isAuthenticated, activeProjectId, projects, updateProject } = useDev();
+  const toast = useToast();
+
+  const activeProject = projects.find(p => p.id === activeProjectId);
+
+  const [whatsappPhone, setWhatsappPhone] = useState(activeProject?.whatsappPhone || '');
+  const [telegramUsername, setTelegramUsername] = useState(activeProject?.telegramUsername || '');
+
+  useEffect(() => {
+    setWhatsappPhone(activeProject?.whatsappPhone || '');
+    setTelegramUsername(activeProject?.telegramUsername || '');
+  }, [activeProject?.id, activeProject?.whatsappPhone, activeProject?.telegramUsername]);
+
+  const handleSaveOrders = () => {
+    if (activeProjectId) {
+      updateProject(activeProjectId, {
+        whatsappPhone,
+        telegramUsername
+      });
+      toast.success(lang === 'en' ? 'Orders settings saved!' : 'Настройки приема заказов сохранены!');
+    }
+  };
 
   return (
     <div className="flex-1 w-full p-4 sm:p-6 md:p-8 max-w-4xl mx-auto space-y-6 animate-fade-in">
@@ -33,7 +56,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ lang }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           {/* Form Group 1 */}
           <div className="space-y-4">
             <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -106,6 +129,59 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ lang }) => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Form Group 3 - Ecom Orders */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-zinc-100">
+          <div className="space-y-4 md:col-span-2 max-w-xl">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <ShoppingCart className="w-3.5 h-3.5" />
+                {lang === 'en' ? 'Orders Receiving' : 'Прием заказов'}
+              </h4>
+              <button 
+                onClick={handleSaveOrders}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm"
+              >
+                {lang === 'en' ? 'Save Settings' : 'Сохранить настройки'}
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-500 mb-1">
+                  {lang === 'en' ? 'WhatsApp Number' : 'Номер WhatsApp'}
+                </label>
+                <input 
+                  type="text" 
+                  value={whatsappPhone}
+                  onChange={(e) => setWhatsappPhone(e.target.value)}
+                  placeholder="79001234567"
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-xs text-zinc-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-500 mb-1">
+                  {lang === 'en' ? 'Telegram Username' : 'Telegram Username'}
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-400 bg-zinc-100 border border-zinc-200 px-2 py-2 rounded-lg font-mono">@</span>
+                  <input 
+                    type="text" 
+                    value={telegramUsername}
+                    onChange={(e) => setTelegramUsername(e.target.value)}
+                    placeholder="durov"
+                    className="flex-1 w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-xs text-zinc-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+            <p className="text-[10px] text-zinc-400 leading-relaxed">
+              {lang === 'en' 
+                ? 'Enable e-commerce features on your blocks to start receiving orders directly to your messengers.' 
+                : 'Включите функции корзины в настройках блоков (кнопок или товаров), чтобы получать уведомления о заказах напрямую в мессенджеры.'}
+            </p>
           </div>
         </div>
 

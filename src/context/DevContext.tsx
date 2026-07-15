@@ -14,6 +14,8 @@ export interface MockProject {
   description?: string;
   layout: 'classic' | 'compact' | 'cover';
   themeStyle: string;
+  whatsappPhone?: string;
+  telegramUsername?: string;
 }
 
 export interface DevContextType {
@@ -33,6 +35,7 @@ export interface DevContextType {
     layout?: MockProject['layout'],
     themeStyle?: string
   ) => void;
+  updateProject: (id: string, updates: Partial<MockProject>) => void;
   deleteProject: (id: string) => void;
   setActiveProjectId: (id: string | null) => void;
   activeTab: TabType;
@@ -177,6 +180,10 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const updateProject = (id: string, updates: Partial<MockProject>) => {
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+  };
+
   return (
     <DevContext.Provider
       value={{
@@ -188,6 +195,7 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         projects,
         activeProjectId,
         createProject,
+        updateProject,
         deleteProject,
         setActiveProjectId,
         activeTab,

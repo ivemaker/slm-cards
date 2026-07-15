@@ -124,6 +124,35 @@ export const ButtonInspector: React.FC<ButtonInspectorProps> = ({
           className="w-full bg-zinc-900 border border-zinc-800 text-xs rounded-lg p-2 text-white focus:outline-none font-mono"
         />
       </div>
+      {/* E-commerce settings */}
+      <div className="space-y-3 bg-zinc-900/50 p-3 rounded-xl border border-zinc-800/50">
+        <div className="flex items-center justify-between">
+          <label className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">
+            {lang === 'en' ? 'Enable Cart/Order' : 'Включить заказ'}
+          </label>
+          <button
+            onClick={() => updateFocusedBlock(b => ({ config: { ...b.config, isEcomEnabled: !b.config?.isEcomEnabled } }))}
+            className={`w-8 h-4 rounded-full transition-colors relative cursor-pointer ${focusedBlock.config?.isEcomEnabled ? 'bg-indigo-500' : 'bg-zinc-700'}`}
+          >
+            <div className={`w-3 h-3 bg-white rounded-full absolute top-0.5 transition-all ${focusedBlock.config?.isEcomEnabled ? 'left-4' : 'left-0.5'}`} />
+          </button>
+        </div>
+        {focusedBlock.config?.isEcomEnabled && (
+          <div>
+            <label className="block text-[9px] uppercase font-bold text-zinc-400 tracking-wider mb-1 font-mono">
+              {lang === 'en' ? 'Price' : 'Цена (руб.)'}
+            </label>
+            <input
+              type="number"
+              value={focusedBlock.config?.price || ''}
+              onChange={(e) => updateFocusedBlock(b => ({ config: { ...b.config, price: parseFloat(e.target.value) || 0 } }))}
+              className="w-full bg-zinc-950 border border-zinc-800 text-xs rounded-lg p-2 text-white focus:outline-none font-mono"
+              placeholder="0"
+            />
+          </div>
+        )}
+      </div>
+
       <div>
         <label className="block text-[8px] uppercase font-bold text-zinc-500 tracking-wider mb-1 font-mono">CTA Look & Accent</label>
         <select

@@ -127,6 +127,22 @@ export const CatalogItemInspector: React.FC<CatalogItemInspectorProps> = ({
           className="w-full bg-zinc-900 border border-zinc-800 text-xs rounded-lg p-2 text-white outline-none font-mono"
         />
       </div>
+
+      {/* E-commerce settings */}
+      <div className="space-y-3 bg-zinc-900/50 p-3 rounded-xl border border-zinc-800/50">
+        <div className="flex items-center justify-between">
+          <label className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">
+            {lang === 'en' ? 'Enable Cart/Order' : 'Включить заказ'}
+          </label>
+          <button
+            onClick={() => updateFocusedBlock(b => ({ config: { ...b.config, isEcomEnabled: !b.config?.isEcomEnabled } }))}
+            className={`w-8 h-4 rounded-full transition-colors relative cursor-pointer ${focusedBlock.config?.isEcomEnabled ? 'bg-indigo-500' : 'bg-zinc-700'}`}
+          >
+            <div className={`w-3 h-3 bg-white rounded-full absolute top-0.5 transition-all ${focusedBlock.config?.isEcomEnabled ? 'left-4' : 'left-0.5'}`} />
+          </button>
+        </div>
+      </div>
+
       {/* SECTION: DESCRIPTION */}
       <div className="pt-3 border-t border-zinc-800/60" />
       <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5">

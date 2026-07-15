@@ -284,6 +284,11 @@ export interface Block {
   tabletOverrides?: Partial<Block>;
   mobileOverrides?: Partial<Block>;
   darkOverrides?: Partial<Block>;
+
+  config?: {
+    price?: number;
+    isEcomEnabled?: boolean;
+  };
 }
 
 export interface TextStyles {
