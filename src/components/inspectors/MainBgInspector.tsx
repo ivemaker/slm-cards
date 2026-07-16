@@ -20,7 +20,6 @@ import { FloatingCubes } from '../FloatingCubes';
 import { Clouds3D } from '../Clouds3D';
 import CssWavesShowcase from '../CssWavesShowcase';
 import FlatWaves from '../FlatWaves';
-import { RaindropsEffect } from '../RaindropsEffect';
 import { BackgroundEffects } from '../BackgroundEffects';
 
 interface MainBgInspectorProps {
@@ -315,11 +314,6 @@ export const MainBgInspector: React.FC<MainBgInspectorProps> = ({
         color: theme === 'dark' ? '#0ea5e9' : '#38bdf8',
         opacity: 100,
       } : {}),
-      ...(typeVal === 'raindrops' ? {
-        speed: 0.5,
-        color: '#0ea5e9',
-        opacity: 100,
-      } : {}),
     };
     updateActiveSettings({ ...activeSettings, effects: updated });
   };
@@ -355,7 +349,6 @@ export const MainBgInspector: React.FC<MainBgInspectorProps> = ({
           <option value="blob">🫧 {lang === 'en' ? 'Organic Blobs' : 'Органические капли'}</option>
           <option value="plasma">🌌 {lang === 'en' ? 'Cosmic Plasma' : 'Космическая плазма'}</option>
           <option value="chroma-lab">🧪 {lang === 'en' ? 'Chroma Lab' : 'Хрома Лаб'}</option>
-          <option value="raindrops">💧 {lang === 'en' ? 'Raindrops' : 'Эффект дождя'}</option>
           <option value="flat-waves">🔮 {lang === 'en' ? '3D Low-Poly Waves' : '3D Волны'}</option>
           <option value="bezier-waves">👑 ➰ {lang === 'en' ? 'Bezier Waves' : 'Кривые Безье'}</option>
           <option value="liquid-ripples">👑 🌊 {lang === 'en' ? 'Interactive Waves' : 'Интерактивные волны'}</option>
@@ -5782,98 +5775,6 @@ export const MainBgInspector: React.FC<MainBgInspectorProps> = ({
                           />
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              ) : effect.type === 'raindrops' ? (
-                <div className="space-y-4">
-                  {/* 16:9 Live Preview Window */}
-                  <div className="space-y-1.5">
-                    <span className="text-[8px] uppercase font-bold text-zinc-500 tracking-wider">
-                      {lang === 'en' ? '📺 Real-time Preview (16:9)' : '📺 Превью в реальном времени (16:9)'}
-                    </span>
-                    <div className="w-full aspect-video rounded-lg relative overflow-hidden bg-black border border-zinc-800">
-                      <RaindropsEffect
-                        speed={effect.speed !== undefined ? effect.speed : 0.4}
-                        opacity={100}
-                      />
-                      {/* Interactive Touch Floating badge */}
-                      <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/70 backdrop-blur-md text-[8px] rounded border border-zinc-850 text-emerald-400 font-mono tracking-wider uppercase">
-                        {lang === 'en' ? 'Rain Simulation' : 'Симуляция дождя'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Controls Row 1: Type & Opacity */}
-                  <div className="grid grid-cols-2 gap-2">
-                    {renderEffectTypeSelect(effect, idx)}
-
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[8px] uppercase font-bold text-zinc-500">
-                          {lang === 'en' ? 'Opacity' : 'Прозрачность'}
-                        </span>
-                        <span className="text-[9px] font-mono text-zinc-400">{effect.opacity}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={effect.opacity}
-                        onChange={(e) => {
-                          const updated = [...activeSettings.effects];
-                          updated[idx] = { ...effect, opacity: parseInt(e.target.value) };
-                          updateActiveSettings({ ...activeSettings, effects: updated });
-                        }}
-                        className="w-full h-1 bg-zinc-900 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Standard Controls */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[8px] uppercase font-bold text-zinc-500">
-                          {lang === 'en' ? 'Complexity' : 'Сложность'}
-                        </span>
-                        <span className="text-[9px] font-mono text-zinc-400">{effect.complexity?.toFixed(1) || '3.0'}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="1"
-                        max="10"
-                        step="0.1"
-                        value={effect.complexity || 3.0}
-                        onChange={(e) => {
-                          const updated = [...activeSettings.effects];
-                          updated[idx] = { ...effect, complexity: parseFloat(e.target.value) };
-                          updateActiveSettings({ ...activeSettings, effects: updated });
-                        }}
-                        className="w-full h-1 bg-zinc-900 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[8px] uppercase font-bold text-zinc-500">
-                          {lang === 'en' ? 'Speed' : 'Скорость'}
-                        </span>
-                        <span className="text-[9px] font-mono text-zinc-400">{effect.speed?.toFixed(1) || '0.4'}x</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="2"
-                        step="0.1"
-                        value={effect.speed || 0.4}
-                        onChange={(e) => {
-                          const updated = [...activeSettings.effects];
-                          updated[idx] = { ...effect, speed: parseFloat(e.target.value) };
-                          updateActiveSettings({ ...activeSettings, effects: updated });
-                        }}
-                        className="w-full h-1 bg-zinc-900 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                      />
                     </div>
                   </div>
                 </div>

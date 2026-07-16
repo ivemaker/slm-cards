@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, ReactNod
 import { useToast } from './ToastContext';
 
 export type PlanType = 'basic' | 'premium';
-export type TabType = 'landing' | 'projects' | 'editor' | 'dashboard' | 'preview' | 'settings';
+export type TabType = 'landing' | 'projects' | 'editor' | 'dashboard' | 'preview' | 'settings' | 'rain_of_arthur';
 
 export interface MockProject {
   id: string;

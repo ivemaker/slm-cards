@@ -13,6 +13,7 @@ import {
   Globe, 
   Languages, 
   Sparkle, 
+  CloudRain, 
   Smartphone, 
   TrendingUp, 
   MousePointerClick, 
@@ -79,7 +80,8 @@ import {
   FrameRadius, 
   SocialLink, 
   CartItem,
-  MainBgConfig
+  MainBgConfig,
+  BgEffect
 } from './types';
 
 import { 
@@ -102,6 +104,7 @@ import { useDev } from './context/DevContext';
 import { SettingsTab } from './components/SettingsTab';
 import { useToast } from './context/ToastContext';
 import { AuthModal } from './components/AuthModal';
+import RainOfArthurPage from './rain_effect/RainOfArthurPage';
 
 import { 
   compressImage, 
@@ -748,99 +751,136 @@ export default function App() {
 
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
-  // Dynamically sync active project settings to the corresponding config layout
+  // Track the project ID that is currently loaded in the configs state
+  const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null);
+  const prevActiveProjectIdRef = useRef<string | null>(null);
+
+  // Effect to load project-specific configurations when switching projects
   useEffect(() => {
+    // Load the active project's configuration
     if (activeProjectId && isDataLoaded) {
       const activeProject = projects.find(p => p.id === activeProjectId);
       if (activeProject) {
         let targetType: 'business' | 'restaurant' | 'catalog' = 'business';
         if (activeProject.type === 'menu') targetType = 'restaurant';
         if (activeProject.type === 'catalog') targetType = 'catalog';
-
-        setConfigs(prev => {
-          const currentConfig = prev[targetType];
-          if (!currentConfig) return prev;
-
-          let modified = false;
-
-          const updatedBlocks = currentConfig.blocks.map(block => {
-            if (block.type === 'profile') {
-              const profile = block.profileContent || {};
-              const newAvatar = activeProject.avatar || profile.avatar || PLACEHOLDERS.avatarBusiness;
-              const newBio = activeProject.description || profile.bio || '';
-              
-              if (
-                profile.name !== activeProject.name ||
-                profile.avatar !== newAvatar ||
-                profile.bio !== newBio
-              ) {
-                modified = true;
-                return {
-                  ...block,
-                  profileContent: {
-                    ...profile,
-                    name: activeProject.name,
-                    avatar: newAvatar,
-                    bio: newBio,
-                  }
-                };
+        
+        async function loadProjectConfig() {
+          try {
+            const savedProjConfig = await get(`nocode_cfg_project_${activeProjectId}`) ?? localStorage.getItem(`nocode_cfg_project_${activeProjectId}`);
+            let loadedConfig: ProjectConfig | null = null;
+            let isNewConfig = false;
+            
+            if (savedProjConfig) {
+              loadedConfig = typeof savedProjConfig === 'string' ? JSON.parse(savedProjConfig) : savedProjConfig;
+            }
+            
+            if (!loadedConfig && (activeProjectId === 'demo-card' || activeProjectId === 'demo-menu')) {
+              // Backward compatibility fallback to the global config ONLY for demo projects
+              const globalKey = `nocode_cfg_${targetType}`;
+              const globalSaved = await get(globalKey) ?? localStorage.getItem(globalKey);
+              if (globalSaved) {
+                loadedConfig = typeof globalSaved === 'string' ? JSON.parse(globalSaved) : globalSaved;
               }
             }
-            return block;
-          });
 
-          // Sync themeStyle if different
-          let updatedMainBg = { ...currentConfig.mainBg };
-          if (activeProject.themeStyle && currentConfig.mainBg?.lightConfig?.fillGradientPreset !== activeProject.themeStyle) {
-            modified = true;
-            const fillGradientPreset = activeProject.themeStyle as any;
+            if (!loadedConfig) {
+              loadedConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIGS[targetType]));
+              isNewConfig = true;
+            }
             
-            const presetEffects = [
-              {
-                id: 'bg-fx-1',
-                type: fillGradientPreset === 'cosmic' ? 'plasma' : fillGradientPreset === 'sunset' ? 'blob' : fillGradientPreset === 'ocean' ? 'css-waves' : fillGradientPreset === 'emerald' ? 'blob' : 'plasma',
-                complexity: 3.0,
-                intensity: 1.0,
-                isPaused: false,
-                opacity: 50,
-              }
-            ];
+            if (loadedConfig) {
+              if (isNewConfig) {
+                let modified = false;
+                
+                // 1. Sync name, avatar, description into profile block if exists
+                loadedConfig.blocks = loadedConfig.blocks.map(block => {
+                  if (block.type === 'profile') {
+                    const profile = block.profileContent;
+                    const newAvatar = activeProject.avatar || profile?.avatar || PLACEHOLDERS.avatarBusiness;
+                    const newBio = activeProject.description || profile?.bio || '';
+                    modified = true;
+                    return {
+                      ...block,
+                      profileContent: {
+                        ...(profile || { name: '', avatar: '', bio: '' }),
+                        name: activeProject.name,
+                        avatar: newAvatar,
+                        bio: newBio,
+                      }
+                    };
+                  }
+                  return block;
+                });
 
-            updatedMainBg = {
-              ...updatedMainBg,
-              lightConfig: {
-                ...updatedMainBg.lightConfig,
-                fillType: 'gradient',
-                fillGradientPreset,
-                fillGradientAnimated: true,
-                effects: presetEffects,
-              },
-              darkConfig: {
-                ...updatedMainBg.darkConfig,
-                fillType: 'gradient',
-                fillGradientPreset,
-                fillGradientAnimated: true,
-                effects: presetEffects,
+                // 2. Sync themeStyle into mainBg
+                if (activeProject.themeStyle) {
+                  modified = true;
+                  const fillGradientPreset = activeProject.themeStyle as any;
+                  const presetEffects: BgEffect[] = [
+                    {
+                      id: 'bg-fx-1',
+                      type: fillGradientPreset === 'cosmic' ? 'plasma' : fillGradientPreset === 'sunset' ? 'blob' : fillGradientPreset === 'ocean' ? 'css-waves' : fillGradientPreset === 'emerald' ? 'blob' : 'plasma',
+                      color: fillGradientPreset === 'cosmic' ? '#6366f1' : fillGradientPreset === 'sunset' ? '#f97316' : fillGradientPreset === 'ocean' ? '#0ea5e9' : fillGradientPreset === 'emerald' ? '#10b981' : '#6366f1',
+                      opacity: 50,
+                      speed: 1,
+                      position: 'top',
+                      height: 100,
+                      seed: 1,
+                      complexity: 3.0,
+                      intensity: 1.0,
+                      isPaused: false,
+                    }
+                  ];
+
+                  const currentMainBg = loadedConfig.mainBg || {};
+                  loadedConfig.mainBg = {
+                    ...currentMainBg,
+                    lightConfig: {
+                      ...currentMainBg.lightConfig,
+                      fillType: 'gradient',
+                      fillGradientPreset,
+                      fillGradientAnimated: true,
+                      effects: presetEffects,
+                    },
+                    darkConfig: {
+                      ...currentMainBg.darkConfig,
+                      fillType: 'gradient',
+                      fillGradientPreset,
+                      fillGradientAnimated: true,
+                      effects: presetEffects,
+                    }
+                  };
+                }
+
+                if (modified) {
+                  const key = `nocode_cfg_project_${activeProjectId}`;
+                  await set(key, loadedConfig).catch(e => console.error('Error saving new project config to IDB', e));
+                  try {
+                    localStorage.setItem(key, JSON.stringify(loadedConfig));
+                  } catch (e) {
+                    console.warn(e);
+                  }
+                }
               }
-            };
+
+              setConfigs(prev => ({
+                ...prev,
+                [targetType]: loadedConfig
+              }));
+              setLoadedProjectId(activeProjectId);
+            }
+          } catch (e) {
+            console.error('Error loading project config', e);
           }
-
-          if (modified) {
-            return {
-              ...prev,
-              [targetType]: {
-                ...currentConfig,
-                blocks: updatedBlocks,
-                mainBg: updatedMainBg,
-              }
-            };
-          }
-
-          return prev;
-        });
+        }
+        
+        loadProjectConfig();
       }
+    } else if (!activeProjectId && isDataLoaded) {
+      setLoadedProjectId(null);
     }
-  }, [activeProjectId, projects, isDataLoaded]);
+  }, [activeProjectId, isDataLoaded]);
 
   // Custom language switcher
   const [lang, setLang] = useState<'en' | 'ru'>('en');
@@ -1186,7 +1226,7 @@ export default function App() {
     const fillTypes: ('color' | 'gradient')[] = ['color', 'gradient'];
     const getRandomFillType = () => fillTypes[Math.floor(Math.random() * fillTypes.length)];
 
-    const effectsTypes = ['plasma', 'bezier-waves', 'flat-waves', 'chroma-lab', 'raindrops', 'liquid-ripples', 'origami-ribbon', 'webgl-polylines', 'neon-stream', 'stars', 'blob', 'none'];
+    const effectsTypes = ['plasma', 'bezier-waves', 'flat-waves', 'chroma-lab', 'liquid-ripples', 'origami-ribbon', 'webgl-polylines', 'neon-stream', 'stars', 'blob', 'none'];
     const activeEffects = [];
     if (Math.random() > 0.2) {
       const effectCount = Math.floor(Math.random() * 3) + 1;
@@ -1634,6 +1674,24 @@ export default function App() {
       localStorage.setItem('nocode_cfg_catalog', JSON.stringify(newConfigs.catalog));
     } catch (e) {
       console.warn('localStorage quota exceeded, falling back to IDB only');
+    }
+
+    // Save project-specific configuration if we have an active project and it is currently loaded
+    if (activeProjectId && loadedProjectId === activeProjectId) {
+      const activeProject = projects.find(p => p.id === activeProjectId);
+      if (activeProject) {
+        let targetType: 'business' | 'restaurant' | 'catalog' = 'business';
+        if (activeProject.type === 'menu') targetType = 'restaurant';
+        if (activeProject.type === 'catalog') targetType = 'catalog';
+        
+        const projectConfig = newConfigs[targetType];
+        set(`nocode_cfg_project_${activeProjectId}`, projectConfig).catch(e => console.error('IDB project save error', e));
+        try {
+          localStorage.setItem(`nocode_cfg_project_${activeProjectId}`, JSON.stringify(projectConfig));
+        } catch (e) {
+          console.warn('localStorage quota exceeded for project save', e);
+        }
+      }
     }
   };
 
@@ -5022,23 +5080,42 @@ export default function App() {
         <header id="top_bar" className="sticky top-0 z-40 bg-zinc-950 text-white border-b border-zinc-800/80">
           <div className="w-full px-4 sm:px-6 md:px-8 h-16 flex items-center justify-between gap-4">
             
-            {/* Left Side: Logo Brand */}
-            <div 
-              onClick={() => {
-                setActiveTab('landing');
-                setIsBurgerMenuOpen(false);
-              }}
-              className="flex items-center gap-3 cursor-pointer group select-none"
-            >
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform">
-                <span className="text-white font-mono font-black text-lg tracking-tighter">S</span>
+            {/* Left Side: Logo Brand & Rain of Arthur Tab */}
+            <div className="flex items-center gap-6">
+              <div 
+                onClick={() => {
+                  setActiveTab('landing');
+                  setIsBurgerMenuOpen(false);
+                }}
+                className="flex items-center gap-3 cursor-pointer group select-none"
+              >
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+                  <span className="text-white font-mono font-black text-lg tracking-tighter">S</span>
+                </div>
+                <div>
+                  <h1 className="text-sm font-black tracking-tight text-white leading-none group-hover:text-indigo-455 transition-colors">SLM Cards</h1>
+                  <p className="text-[9px] text-zinc-500 font-mono tracking-wider uppercase mt-1 leading-none">
+                    {lang === 'en' ? 'NO-CODE PLATFORM' : 'NO-CODE ПЛАТФОРМА'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-sm font-black tracking-tight text-white leading-none group-hover:text-indigo-455 transition-colors">SLM Cards</h1>
-                <p className="text-[9px] text-zinc-500 font-mono tracking-wider uppercase mt-1 leading-none">
-                  {lang === 'en' ? 'NO-CODE PLATFORM' : 'NO-CODE ПЛАТФОРМА'}
-                </p>
-              </div>
+
+              {/* Rain of Arthur Navigation Tab */}
+              <button
+                id="tab_rain_of_arthur"
+                onClick={() => {
+                  setActiveTab('rain_of_arthur');
+                  setIsBurgerMenuOpen(false);
+                }}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  activeTab === 'rain_of_arthur' 
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15 border border-indigo-500' 
+                    : 'text-zinc-450 hover:text-white hover:bg-zinc-900/60 border border-transparent hover:border-zinc-800'
+                }`}
+              >
+                <CloudRain size={13} className={activeTab === 'rain_of_arthur' ? 'animate-bounce' : ''} />
+                <span>{lang === 'en' ? 'Rain of Arthur' : 'Дождь Артура'}</span>
+              </button>
             </div>
 
             {/* Center Side: Tab Switcher (My Projects and Editor) */}
@@ -5256,6 +5333,26 @@ export default function App() {
                           <div className="h-px bg-zinc-800/60 my-1" />
                         </div>
                       )}
+
+                      {/* Public Navigation */}
+                      <div className="md:hidden flex flex-col gap-0.5">
+                        <div className="px-3 py-1.5 text-[9px] text-zinc-500 uppercase tracking-wider font-bold">
+                          {lang === 'en' ? 'Navigation' : 'Навигация'}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setActiveTab('rain_of_arthur');
+                            setIsBurgerMenuOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left cursor-pointer ${
+                            activeTab === 'rain_of_arthur' ? 'bg-indigo-600 text-white' : 'text-zinc-300 hover:bg-zinc-800'
+                          }`}
+                        >
+                          <CloudRain size={14} className="shrink-0" />
+                          <span>{lang === 'en' ? 'Rain of Arthur' : 'Дождь Артура'}</span>
+                        </button>
+                        <div className="h-px bg-zinc-800/60 my-1" />
+                      </div>
 
                       {/* Management section */}
                       <div className="px-3 py-1.5 text-[9px] text-zinc-500 uppercase tracking-wider font-bold">
@@ -5861,7 +5958,7 @@ export default function App() {
 
 
         {/* LANDING TAB */}
-        {(!isAuthenticated || activeTab === 'landing') && (
+        {(!isAuthenticated || activeTab === 'landing') && activeTab !== 'rain_of_arthur' && (
           <div className="flex-1 w-full bg-zinc-950 flex flex-col items-center justify-start py-12 sm:py-20 px-4 sm:px-6 md:px-8 text-center animate-fade-in relative overflow-hidden min-h-[calc(100vh-64px)] z-0">
             {/* Ambient Background Glows */}
             <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
@@ -5978,6 +6075,11 @@ export default function App() {
         {/* SETTINGS TAB */}
         {isAuthenticated && activeTab === 'settings' && (
           <SettingsTab lang={lang} />
+        )}
+
+        {/* RAIN OF ARTHUR TAB */}
+        {activeTab === 'rain_of_arthur' && (
+          <RainOfArthurPage />
         )}
           </main>
         </div>

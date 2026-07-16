@@ -330,7 +330,7 @@ export interface TopoLayer {
 
 export interface BgEffect {
   id: string;
-  type: 'css-waves' | 'blob' | 'plasma' | 'chroma-lab' | 'raindrops' | 'flat-waves' | 'bezier-waves' | 'liquid-ripples' | 'origami-ribbon' | 'webgl-polylines' | 'neon-stream' | 'stars' | 'webgl-metaballs' | 'cyber-lines' | 'noise-topography' | 'vector-forms' | 'research-network' | 'geo-shapes' | 'floating-cubes' | 'clouds-3d';
+  type: 'css-waves' | 'blob' | 'plasma' | 'chroma-lab' | 'flat-waves' | 'bezier-waves' | 'liquid-ripples' | 'origami-ribbon' | 'webgl-polylines' | 'neon-stream' | 'stars' | 'webgl-metaballs' | 'cyber-lines' | 'noise-topography' | 'vector-forms' | 'research-network' | 'geo-shapes' | 'floating-cubes' | 'clouds-3d';
   color: string;
   opacity: number;
   speed: number;

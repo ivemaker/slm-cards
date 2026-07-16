@@ -4,7 +4,6 @@ import { BgEffect } from '../types';
 import { normalizeEffectType } from '../utils';
 import { CosmicPlasmaNebula } from './CosmicPlasmaNebula';
 import { ChromaLab } from './ChromaLab';
-import { RaindropsEffect } from './RaindropsEffect';
 import FlatWaves from './FlatWaves';
 import { BezierWaves } from './BezierWaves';
 import { LiquidRipples } from './LiquidRipples';
@@ -165,10 +164,6 @@ const EffectItem = React.memo<{ effect: BgEffect; bgImage?: string; isMenuOpen?:
         }}
       />
     );
-  }
-
-  if (type === 'raindrops') {
-    return <RaindropsEffect speed={forcePause ? 0 : speed} opacity={opacity} backgroundImage={bgImage} />;
   }
 
   if (type === 'flat-waves') {

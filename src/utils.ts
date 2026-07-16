@@ -314,7 +314,7 @@ export function generateSimpleQRCodeSVG(text: string, size = 250): string {
   return svg;
 }
 
-export function normalizeEffectType(type: string): 'css-waves' | 'blob' | 'plasma' | 'chroma-lab' | 'raindrops' | 'flat-waves' | 'bezier-waves' | 'liquid-ripples' | 'origami-ribbon' | 'webgl-polylines' | 'neon-stream' | 'stars' | 'webgl-metaballs' | 'cyber-lines' | 'noise-topography' | 'vector-forms' | 'research-network' | 'geo-shapes' | 'floating-cubes' | 'clouds-3d' {
+export function normalizeEffectType(type: string): 'css-waves' | 'blob' | 'plasma' | 'chroma-lab' | 'flat-waves' | 'bezier-waves' | 'liquid-ripples' | 'origami-ribbon' | 'webgl-polylines' | 'neon-stream' | 'stars' | 'webgl-metaballs' | 'cyber-lines' | 'noise-topography' | 'vector-forms' | 'research-network' | 'geo-shapes' | 'floating-cubes' | 'clouds-3d' {
   if (!type) return 'css-waves';
   const t = type.toLowerCase().trim();
   if (t === 'css-waves' || t === 'procedural-3d-waves' || t === 'procedural 3d waves' || t === 'waves' || t === '3d waves') return 'css-waves';
@@ -327,7 +327,7 @@ export function normalizeEffectType(type: string): 'css-waves' | 'blob' | 'plasm
   if (t === 'bezier-waves' || t === 'bezier waves') return 'bezier-waves';
   if (t === 'liquid-ripples' || t === 'liquid ripples' || t === 'interactive-waves' || t === 'interactive waves') return 'liquid-ripples';
   if (t === 'neon-stream' || t === 'neon stream') return 'neon-stream';
-  if (t === 'raindrops' || t === 'rain' || t === 'raindrops-effect') return 'raindrops';
+  if (t === 'raindrops' || t === 'rain' || t === 'raindrops-effect') return 'css-waves';
   if (t === 'webgl-metaballs' || t === 'webgl metaballs' || t === 'metaballs' || t === 'organic metaballs') return 'webgl-metaballs';
   if (t === 'cyber-lines' || t === 'cyber lines') return 'cyber-lines';
   if (t === 'noise-topography' || t === 'noise topography' || t === 'topography' || t === 'noise_topography') return 'noise-topography';
