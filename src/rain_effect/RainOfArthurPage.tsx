@@ -21,7 +21,8 @@ import {
   Info,
   ArrowUp,
   ArrowDown,
-  Upload
+  Upload,
+  Music
 } from "lucide-react";
 
 import Raindrops, { RaindropsOptions } from "../lib/raindrops";
@@ -33,6 +34,7 @@ import {
 } from "../lib/texture-generator";
 import WeatherAudioSynthesizer from "../lib/audio-synthesizer";
 import { random } from "../lib/random";
+import { useDev } from "../context/DevContext";
 const DEFAULT_BACKGROUND_IMAGE = "/misty_rainy_forest_1781780284992.jpg";
 
 // Immersive Preset Coordinates & Imagery (using premium copyright-free Unsplash bokeh & nature scenes)
@@ -436,7 +438,12 @@ function generateLightning(width: number, height: number, strikeX: number): Ligh
   return { mainPath, branches: [], strikeX };
 }
 
-export default function RainOfArthurPage() {
+interface RainOfArthurPageProps {
+  children?: React.ReactNode;
+}
+
+export default function RainOfArthurPage({ children }: RainOfArthurPageProps) {
+  const { developerMode } = useDev();
   // Theme & Preset State
   const [activePreset, setActivePreset] = useState<WeatherPreset>(PRESETS[4]); // Start with SUNNY per request (сначала сухое стекло)
   const [loading, setLoading] = useState<boolean>(true);
@@ -510,8 +517,37 @@ export default function RainOfArthurPage() {
 
   // Audio & Immersive Toggles
   const [isAudioEnabled, setIsAudioEnabled] = useState<boolean>(false);
+  const [isMusicEnabled, setIsMusicEnabled] = useState<boolean>(false);
   const [masterVolume, setMasterVolume] = useState<number>(0.3);
   const [thunderVolume, setThunderVolume] = useState<number>(0.8);
+
+  const backgroundMusicRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // Initialize background music
+    const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+    const audioPath = `${window.location.origin}${base}/FOREST.mp3`;
+    backgroundMusicRef.current = new Audio(audioPath);
+    backgroundMusicRef.current.loop = true;
+    backgroundMusicRef.current.volume = 0.7; // Subtle
+
+    return () => {
+      if (backgroundMusicRef.current) {
+        backgroundMusicRef.current.pause();
+        backgroundMusicRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (backgroundMusicRef.current) {
+      if (isMusicEnabled) {
+        backgroundMusicRef.current.play().catch(e => console.error("Audio play failed:", e));
+      } else {
+        backgroundMusicRef.current.pause();
+      }
+    }
+  }, [isMusicEnabled]);
 
   const grozaExtensionsRef = useRef<{ groza1: string; groza2: string }>({
     groza1: 'mp3',
@@ -890,9 +926,10 @@ export default function RainOfArthurPage() {
       if (!canvasEl) return;
 
       // Canvas Isolation Protocol: direct DOM measurement for size
-      const rect = canvasEl.getBoundingClientRect();
-      const w = Math.max(1, Math.floor(rect.width || window.innerWidth));
-      const h = Math.max(1, Math.floor(rect.height || window.innerHeight));
+      const parent = canvasEl.parentElement;
+      const rect = parent ? parent.getBoundingClientRect() : null;
+      const w = Math.max(1, Math.floor(rect && rect.width > 0 ? rect.width : window.innerWidth));
+      const h = Math.max(1, Math.floor(rect && rect.height > 0 ? rect.height : window.innerHeight));
 
       // Limit devicePixelRatio to maximum of 2 to prevent GPU overloads
       const dpi = Math.min(window.devicePixelRatio || 1, 2);
@@ -1959,7 +1996,7 @@ export default function RainOfArthurPage() {
   };
 
   return (
-    <div ref={containerRef} className="relative w-screen h-screen overflow-hidden bg-zinc-950 font-sans select-none">
+    <div ref={containerRef} className="fixed top-16 left-0 right-0 bottom-0 w-full overflow-hidden bg-zinc-950 font-sans select-none z-10">
       
       {/* 1. Master WebGL Simulation Canvas */}
       <canvas
@@ -2123,23 +2160,54 @@ export default function RainOfArthurPage() {
         </>
       )}
 
-      {/* 2. Glassmorphic header control bar */}
-      <header className="absolute top-0 inset-x-0 h-16 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-end px-6 z-20 pointer-events-none">
-        {/* System metrics tags */}
-        <div className="flex items-center gap-4 text-xs font-mono text-zinc-300 pointer-events-auto bg-black/40 backdrop-blur-md border border-white/5 rounded-full px-4 py-1.5 shadow-lg">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-            <span className="text-zinc-400">FPS:</span>
-            <span className="font-bold text-white">{calculatedFps}</span>
-          </div>
-          <div className="h-3 w-[1px] bg-white/10" />
-          <div className="flex items-center gap-1.5">
-            <Compass className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="text-zinc-400">Drops:</span>
-            <span className="font-bold text-white">{activeRaindropsCount}</span>
-          </div>
+      {/* 1.5 Audio & Music Controls (Top Left, always visible) */}
+      <div className="absolute top-6 left-6 z-40 flex items-center gap-4 pointer-events-auto">
+        <button
+          onClick={toggleSound}
+          className="p-2 transition-transform hover:scale-110 active:scale-95"
+          title={isAudioEnabled ? "Mute Rain Sound" : "Play Rain Sound"}
+        >
+          {isAudioEnabled ? (
+            <Volume2 className="w-6 h-6 text-white drop-shadow-md" />
+          ) : (
+            <VolumeX className="w-6 h-6 text-white/50 drop-shadow-md" />
+          )}
+        </button>
+        <button
+          onClick={() => setIsMusicEnabled(!isMusicEnabled)}
+          className="p-2 transition-transform hover:scale-110 active:scale-95"
+          title={isMusicEnabled ? "Mute Background Music" : "Play Background Music"}
+        >
+          <Music className={`w-6 h-6 drop-shadow-md ${isMusicEnabled ? 'text-white' : 'text-white/50'}`} />
+        </button>
+      </div>
+
+      {/* Insert children (landing page content) if present */}
+      {children && (
+        <div className="absolute inset-0 z-10 pointer-events-auto overflow-y-auto overflow-x-hidden w-full h-full flex flex-col">
+          {children}
         </div>
-      </header>
+      )}
+
+      {/* 2. Glassmorphic header control bar */}
+      {developerMode && (
+        <header className="absolute top-0 inset-x-0 h-16 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-end px-6 z-20 pointer-events-none">
+          {/* System metrics tags */}
+          <div className="flex items-center gap-4 text-xs font-mono text-zinc-300 pointer-events-auto bg-black/40 backdrop-blur-md border border-white/5 rounded-full px-4 py-1.5 shadow-lg">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              <span className="text-zinc-400">FPS:</span>
+              <span className="font-bold text-white">{calculatedFps}</span>
+            </div>
+            <div className="h-3 w-[1px] bg-white/10" />
+            <div className="flex items-center gap-1.5">
+              <Compass className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-zinc-400">Drops:</span>
+              <span className="font-bold text-white">{activeRaindropsCount}</span>
+            </div>
+          </div>
+        </header>
+      )}
 
       {/* Loading Overlay */}
       {loading && (
@@ -2173,11 +2241,12 @@ export default function RainOfArthurPage() {
       )}
 
       {/* 3. Sliding Translucent Glass Parameter Controller */}
-      <section
-        className={`absolute right-4 top-20 z-30 transition-all duration-300 max-h-[82vh] w-80 md:w-85 overflow-y-auto rounded-3xl bg-black/55 backdrop-blur-xl border border-white/10 p-5 text-white flex flex-col gap-5 ${activePreset.accentGlow} shadow-2xl ${
-          isControllerCollapsed ? "translate-x-[92%] opacity-60" : "translate-x-0"
-        }`}
-      >
+      {developerMode && (
+        <section
+          className={`absolute right-4 top-20 z-30 transition-all duration-300 max-h-[82vh] w-80 md:w-85 overflow-y-auto rounded-3xl bg-black/55 backdrop-blur-xl border border-white/10 p-5 text-white flex flex-col gap-5 ${activePreset.accentGlow} shadow-2xl ${
+            isControllerCollapsed ? "translate-x-[92%] opacity-60" : "translate-x-0"
+          }`}
+        >
         {/* Toggle collapsible header */}
         <div className="flex items-center justify-between border-b border-white/5 pb-3">
           <button
@@ -2882,7 +2951,8 @@ export default function RainOfArthurPage() {
             Click, hold, or drag across the glass pane to draw large custom water droplets that physically collide and merge with falling raindrops!
           </p>
         </div>
-      </section>
+        </section>
+      )}
 
 
     </div>

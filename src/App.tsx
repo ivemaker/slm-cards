@@ -5080,43 +5080,26 @@ export default function App() {
         <header id="top_bar" className="sticky top-0 z-40 bg-zinc-950 text-white border-b border-zinc-800/80">
           <div className="w-full px-4 sm:px-6 md:px-8 h-16 flex items-center justify-between gap-4">
             
-            {/* Left Side: Logo Brand & Rain of Arthur Tab */}
-            <div className="flex items-center gap-6">
-              <div 
-                onClick={() => {
-                  setActiveTab('landing');
-                  setIsBurgerMenuOpen(false);
-                }}
-                className="flex items-center gap-3 cursor-pointer group select-none"
-              >
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform">
-                  <span className="text-white font-mono font-black text-lg tracking-tighter">S</span>
-                </div>
-                <div>
-                  <h1 className="text-sm font-black tracking-tight text-white leading-none group-hover:text-indigo-455 transition-colors">SLM Cards</h1>
-                  <p className="text-[9px] text-zinc-500 font-mono tracking-wider uppercase mt-1 leading-none">
-                    {lang === 'en' ? 'NO-CODE PLATFORM' : 'NO-CODE ПЛАТФОРМА'}
-                  </p>
+              {/* Left Side: Logo Brand */}
+              <div className="flex items-center gap-6">
+                <div 
+                  onClick={() => {
+                    setActiveTab('landing');
+                    setIsBurgerMenuOpen(false);
+                  }}
+                  className="flex items-center gap-3 cursor-pointer group select-none"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+                    <span className="text-white font-mono font-black text-lg tracking-tighter">S</span>
+                  </div>
+                  <div>
+                    <h1 className="text-sm font-black tracking-tight text-white leading-none group-hover:text-indigo-455 transition-colors">SLM Cards</h1>
+                    <p className="text-[9px] text-zinc-500 font-mono tracking-wider uppercase mt-1 leading-none">
+                      {lang === 'en' ? 'NO-CODE PLATFORM' : 'NO-CODE ПЛАТФОРМА'}
+                    </p>
+                  </div>
                 </div>
               </div>
-
-              {/* Rain of Arthur Navigation Tab */}
-              <button
-                id="tab_rain_of_arthur"
-                onClick={() => {
-                  setActiveTab('rain_of_arthur');
-                  setIsBurgerMenuOpen(false);
-                }}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                  activeTab === 'rain_of_arthur' 
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15 border border-indigo-500' 
-                    : 'text-zinc-450 hover:text-white hover:bg-zinc-900/60 border border-transparent hover:border-zinc-800'
-                }`}
-              >
-                <CloudRain size={13} className={activeTab === 'rain_of_arthur' ? 'animate-bounce' : ''} />
-                <span>{lang === 'en' ? 'Rain of Arthur' : 'Дождь Артура'}</span>
-              </button>
-            </div>
 
             {/* Center Side: Tab Switcher (My Projects and Editor) */}
             {isAuthenticated && (
@@ -5339,18 +5322,6 @@ export default function App() {
                         <div className="px-3 py-1.5 text-[9px] text-zinc-500 uppercase tracking-wider font-bold">
                           {lang === 'en' ? 'Navigation' : 'Навигация'}
                         </div>
-                        <button
-                          onClick={() => {
-                            setActiveTab('rain_of_arthur');
-                            setIsBurgerMenuOpen(false);
-                          }}
-                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left cursor-pointer ${
-                            activeTab === 'rain_of_arthur' ? 'bg-indigo-600 text-white' : 'text-zinc-300 hover:bg-zinc-800'
-                          }`}
-                        >
-                          <CloudRain size={14} className="shrink-0" />
-                          <span>{lang === 'en' ? 'Rain of Arthur' : 'Дождь Артура'}</span>
-                        </button>
                         <div className="h-px bg-zinc-800/60 my-1" />
                       </div>
 
@@ -5958,110 +5929,79 @@ export default function App() {
 
 
         {/* LANDING TAB */}
-        {(!isAuthenticated || activeTab === 'landing') && activeTab !== 'rain_of_arthur' && (
-          <div className="flex-1 w-full bg-zinc-950 flex flex-col items-center justify-start py-12 sm:py-20 px-4 sm:px-6 md:px-8 text-center animate-fade-in relative overflow-hidden min-h-[calc(100vh-64px)] z-0">
-            {/* Ambient Background Glows */}
-            <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/10 rounded-full blur-[120px] pointer-events-none" />
-            
-            <div className="max-w-4xl mx-auto space-y-12 relative z-10 flex flex-col items-center">
-              {/* Premium Badge */}
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-semibold text-indigo-400 shadow-xl">
-                <Sparkle size={13} className="text-indigo-400 animate-pulse" />
-                <span>SLM Cards No-Code Premium v7.0</span>
+        {(!isAuthenticated || activeTab === 'landing') && (
+          <RainOfArthurPage>
+            <div className="w-full flex flex-col items-center py-12 sm:py-20 px-4 sm:px-6 md:px-8 text-center relative min-h-[calc(100vh-64px)] z-0">
+              {/* Top region: Logo centered between top and headline */}
+              <div className="flex-1 w-full flex items-center justify-center relative z-10">
+                <img 
+                  src="/SLM%20cards%20logo.svg" 
+                  alt="SLM Cards Logo" 
+                  className="h-16 w-auto opacity-90 drop-shadow-2xl"
+                  style={{ filter: 'brightness(0) invert(1)' }}
+                />
               </div>
 
-              {/* Header Title */}
-              <div className="space-y-4 max-w-2xl">
-                <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
-                  {lang === 'en' 
-                    ? 'Create Stunning Digital Cards & Micro-Landings' 
-                    : 'Создавайте стильные цифровые визитки и микролендинги'}
-                </h2>
-                <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
-                  {lang === 'en'
-                    ? 'The ultimate responsive builder with glass effects, 3D overlays, instant QR code distribution, and order catalogs. No coding required.'
-                    : 'Профессиональный адаптивный конструктор с эффектами стекла, 3D фонами, мгновенной генерацией QR-кодов и каталогами заказов. Без единой строчки кода.'}
-                </p>
-              </div>
-
-              {/* Interactive CTA buttons */}
-              <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-md justify-center">
-                <button
-                  onClick={() => {
-                    if (!isAuthenticated) {
-                      setIsAuthModalOpen(true);
-                    } else {
-                      setActiveTab('projects');
-                    }
-                  }}
-                  className="w-full sm:w-auto px-8 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/25 transition-all active:scale-98 cursor-pointer border border-indigo-500 flex items-center justify-center gap-2"
-                >
-                  <FolderPlus size={16} />
-                  <span>{lang === 'en' ? 'Create New Project' : 'Создать проект'}</span>
-                </button>
-                <button
-                  onClick={() => {
-                    if (!isAuthenticated) {
-                      setIsAuthModalOpen(true);
-                    } else {
-                      setActiveTab('editor');
-                    }
-                  }}
-                  className="w-full sm:w-auto px-8 py-3.5 bg-zinc-900 hover:bg-zinc-850 text-zinc-300 hover:text-white font-bold text-sm rounded-xl transition-all active:scale-98 cursor-pointer border border-zinc-800 flex items-center justify-center gap-2"
-                >
-                  <Sliders size={16} />
-                  <span>{lang === 'en' ? 'Open Editor Studio' : 'Открыть редактор'}</span>
-                </button>
-              </div>
-
-              {/* BENTO GRID / FEATURES HIGHLIGHT */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full pt-8 text-left">
-                {[
-                  {
-                    icon: <Layers className="text-indigo-400" size={20} />,
-                    title: lang === 'en' ? 'Dynamic Layouts' : 'Умные эффекты',
-                    desc: lang === 'en' 
-                      ? 'Frosted glass, interactive streams, custom gradient patterns.' 
-                      : 'Матовое стекло, неоновые потоки и кастомные градиентные узоры.'
-                  },
-                  {
-                    icon: <Smartphone className="text-purple-400" size={20} />,
-                    title: lang === 'en' ? '100% Adaptive' : '100% Адаптивность',
-                    desc: lang === 'en' 
-                      ? 'Engineered to look gorgeous on every smartphone, tablet, and PC.' 
-                      : 'Идеальное отображение на смартфонах, планшетах и компьютерах.'
-                  },
-                  {
-                    icon: <TrendingUp className="text-emerald-400" size={20} />,
-                    title: lang === 'en' ? 'Real-Time Stats' : 'Аналитика кликов',
-                    desc: lang === 'en' 
-                      ? 'Track visual views, button clicks, and order conversion instantly.' 
-                      : 'Отслеживайте просмотры, клики и конверсию в реальном времени.'
-                  },
-                  {
-                    icon: <ShoppingCart className="text-amber-400" size={20} />,
-                    title: lang === 'en' ? 'Order Catalogs' : 'Каталог продуктов',
-                    desc: lang === 'en' 
-                      ? 'Display digital products, menus, and collect quick orders.' 
-                      : 'Размещайте ваши цифровые товары и оформляйте заказы.'
-                  }
-                ].map((item, idx) => (
-                  <div key={idx} className="p-6 bg-zinc-900/60 border border-zinc-800/80 rounded-2xl flex flex-col gap-3 hover:border-zinc-700 transition-colors shadow-2xl">
-                    <div className="w-10 h-10 rounded-xl bg-zinc-850 border border-zinc-800 flex items-center justify-center shrink-0">
-                      {item.icon}
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white tracking-tight">{item.title}</h4>
-                      <p className="text-xs text-zinc-400 leading-relaxed mt-1.5">{item.desc}</p>
-                    </div>
+              <div className="max-w-4xl mx-auto space-y-12 relative z-10 flex flex-col items-center">
+                {/* Header Title */}
+                <div className="space-y-8 max-w-2xl flex flex-col items-center">
+                  <div className="space-y-4">
+                    <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
+                      {lang === 'en' 
+                        ? 'Create Stunning Digital Cards & Micro-Landings' 
+                        : 'Создавайте стильные цифровые визитки и микролендинги'}
+                    </h2>
+                    <p className="text-sm sm:text-base text-zinc-300 leading-relaxed drop-shadow-md">
+                      {lang === 'en'
+                        ? 'The ultimate responsive builder with glass effects, 3D overlays, instant QR code distribution, and order catalogs. No coding required.'
+                        : 'Профессиональный адаптивный конструктор с эффектами стекла, 3D фонами, мгновенной генерацией QR-кодов и каталогами заказов. Без единой строчки кода.'}
+                    </p>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+                </div>
 
+                {/* Interactive CTA buttons */}
+                <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-md justify-center">
+                  <button
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        setIsAuthModalOpen(true);
+                      } else {
+                        setActiveTab('projects');
+                      }
+                    }}
+                    className="w-full sm:w-auto px-12 py-5 backdrop-blur-2xl hover:bg-white/5 text-white font-bold text-sm rounded-none transition-all active:scale-95 cursor-pointer flex items-center justify-center pointer-events-auto"
+                  >
+                    <span>{lang === 'en' ? 'CREATE PROJECT' : 'СОЗДАТЬ ПРОЕКТ'}</span>
+                  </button>
+                </div>
+
+                {/* BENTO GRID / FEATURES HIGHLIGHT */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 w-full pt-12 text-center pointer-events-auto">
+                  {[
+                    {
+                      title: lang === 'en' ? 'Dynamic Layouts' : 'Умные эффекты',
+                    },
+                    {
+                      title: lang === 'en' ? '100% Adaptive' : '100% Адаптивность',
+                    },
+                    {
+                      title: lang === 'en' ? 'Real-Time Stats' : 'Аналитика кликов',
+                    },
+                    {
+                      title: lang === 'en' ? 'Order Catalogs' : 'Каталог продуктов',
+                    }
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex flex-col items-center">
+                      <h4 className="text-xs font-bold text-white tracking-[0.2em] uppercase opacity-70">{item.title}</h4>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Bottom region: Equal spacer to keep center content centered */}
+              <div className="flex-1 w-full" />
+            </div>
+          </RainOfArthurPage>
+        )}
         {/* PROJECTS TAB */}
         {isAuthenticated && activeTab === 'projects' && (
           <ProjectsTab lang={lang} />
@@ -6075,11 +6015,6 @@ export default function App() {
         {/* SETTINGS TAB */}
         {isAuthenticated && activeTab === 'settings' && (
           <SettingsTab lang={lang} />
-        )}
-
-        {/* RAIN OF ARTHUR TAB */}
-        {activeTab === 'rain_of_arthur' && (
-          <RainOfArthurPage />
         )}
           </main>
         </div>
