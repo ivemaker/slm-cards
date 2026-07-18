@@ -28,7 +28,7 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
 
   // Priority source of truth is the block's own profile settings, falling back to projectLayout only if not explicitly defined
   const isRow = isHeaderSection 
-    ? (profile.layout !== undefined ? profile.layout === 'row' : projectLayout === 'compact')
+    ? (profile.layout !== undefined ? profile.layout === 'row' : (projectLayout === 'compact' || projectLayout === 'cover'))
     : (profile.layout === 'row');
   const align = (isHeaderSection 
     ? (profile.align !== undefined ? profile.align : (projectLayout === 'classic' ? 'center' : 'left')) 
@@ -482,51 +482,6 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
     block.textShadowEnabled || block.textGlowEnabled || block.textShimmerEnabled ||
     block.titleTextStyles?.textShadowEnabled || block.titleTextStyles?.textGlowEnabled || block.titleTextStyles?.textShimmerEnabled ||
     block.descTextStyles?.textShadowEnabled || block.descTextStyles?.textGlowEnabled || block.descTextStyles?.textShimmerEnabled;
-
-  if (projectLayout === 'cover') {
-    return (
-      <div className="w-full relative z-10 flex flex-col items-center">
-        {/* Banner Cover with stylish background theme */}
-        <div className="w-full h-24 rounded-t-2xl bg-gradient-to-r from-zinc-800 via-indigo-950/70 to-zinc-800 relative overflow-hidden border-b border-zinc-800/40 shrink-0">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-500/15 via-transparent to-transparent animate-pulse" />
-          {profile.bgImage && (
-            <img src={profile.bgImage} className="w-full h-full object-cover opacity-60" alt="" referrerPolicy="no-referrer" />
-          )}
-        </div>
-        
-        {/* Avatar overlapping */}
-        <div className="-mt-10 mb-3 relative z-25 shrink-0">
-          {avatarElement}
-        </div>
-
-        {/* Text centered below */}
-        <div className={`space-y-1.5 w-full text-center px-4 ${hasTextEffects ? 'overflow-visible' : 'overflow-hidden'}`}>
-          <h2 
-            className={`font-bold tracking-tight ${(block.titleTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''}`}
-            style={{
-              ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
-              ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
-              fontSize: block.customTitleFontSize !== undefined ? `${block.customTitleFontSize}px` : '20px',
-              ...getTextStyles(block, false, isPremium)
-            }}
-          >
-            {profile.name}
-          </h2>
-          <p 
-            className={`text-xs opacity-85 leading-relaxed font-light whitespace-pre-line break-words max-w-full ${(block.descTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''}`}
-            style={{
-              ...(block.customDescColor ? { color: block.customDescColor } : block.customTextColor ? { color: block.customTextColor } : {}),
-              ...(block.customDescFont ? { fontFamily: block.customDescFont } : {}),
-              fontSize: block.customDescFontSize !== undefined ? `${block.customDescFontSize}px` : undefined,
-              ...getTextStyles(block, true, isPremium)
-            }}
-          >
-            {profile.bio}
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="w-full relative z-10">

@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { get, set } from 'idb-keyval';
+import { get, set, del } from 'idb-keyval';
+import STATIC_READY_TEMPLATES from './custom_ready_templates.json';
 import { 
   ArrowUp, 
   ArrowDown, 
@@ -802,14 +803,24 @@ export default function App() {
                     const profile = block.profileContent;
                     const newAvatar = activeProject.avatar || profile?.avatar || PLACEHOLDERS.avatarBusiness;
                     const newBio = activeProject.description || profile?.bio || '';
+                    
+                    // Determine initial inspector-compatible settings based on selected project creation layout
+                    const initLayout = activeProject.layout === 'classic' ? 'stacked' : 'row';
+                    const initAlign = activeProject.layout === 'classic' ? 'center' : 'left';
+                    const initFullWidth = activeProject.layout === 'cover';
+                    
                     modified = true;
                     return {
                       ...block,
+                      fullWidth: initFullWidth,
                       profileContent: {
                         ...(profile || { name: '', avatar: '', bio: '' }),
                         name: activeProject.name,
                         avatar: newAvatar,
                         bio: newBio,
+                        layout: initLayout,
+                        align: initAlign,
+                        fullWidth: initFullWidth,
                       }
                     };
                   }
@@ -935,39 +946,35 @@ export default function App() {
             apiTemplates = await res.json();
           }
         } catch (apiErr) {
-          console.warn('API fetch for custom templates failed, using storage fallback', apiErr);
+          console.warn('API fetch for custom templates failed, using static fallback', apiErr);
         }
 
-        const savedReady = await get('nocode_custom_ready_templates') ?? localStorage.getItem('nocode_custom_ready_templates');
-        let localTemplates = typeof savedReady === 'string' ? JSON.parse(savedReady) : savedReady;
-        if (!Array.isArray(localTemplates)) {
-          localTemplates = [];
+        // Rescue user templates from old nocode_custom_ready_templates if they were migrated there previously
+        let rescuedUserTemplates: any[] = [];
+        try {
+          const savedReady = await get('nocode_custom_ready_templates') ?? localStorage.getItem('nocode_custom_ready_templates');
+          const localTemplates = typeof savedReady === 'string' ? JSON.parse(savedReady) : savedReady;
+          if (Array.isArray(localTemplates) && localTemplates.length > 0) {
+            rescuedUserTemplates = localTemplates.filter(t => 
+              t && (t.isUserTemplate === true || t.id?.startsWith('user-') || (!t.id?.startsWith('tpl-') && !t.id?.startsWith('ready-')))
+            );
+          }
+        } catch (rescueErr) {
+          console.warn('Could not check ready templates for custom templates to rescue', rescueErr);
         }
 
-        // Combine both sources by ID
+        // Clean up any old copies of ready-made templates from local storage / IndexedDB
+        try {
+          localStorage.removeItem('nocode_custom_ready_templates');
+          del('nocode_custom_ready_templates').catch(e => console.error(e));
+        } catch (e) {}
+
+        const systemTemplates = (apiTemplates !== null && Array.isArray(apiTemplates) && apiTemplates.length > 0)
+          ? apiTemplates
+          : STATIC_READY_TEMPLATES;
+
         const templateMap = new Map<string, any>();
-        const hasLocalSavedFlag = localStorage.getItem('nocode_templates_initialized');
-
-        // 1. Server-side templates
-        if (apiTemplates !== null && Array.isArray(apiTemplates)) {
-          localStorage.setItem('nocode_templates_initialized', 'true');
-          apiTemplates.forEach(t => {
-            if (t && t.id && t.id !== 'tpl-anakonda' && t.id !== 'anakonda' && t.nameEn?.toLowerCase() !== 'anakonda' && t.nameRu?.toLowerCase() !== 'anakonda') {
-              templateMap.set(t.id, t);
-            }
-          });
-        } else if (!hasLocalSavedFlag && localTemplates.length === 0) {
-          // Offline fallback only on very first load
-          localStorage.setItem('nocode_templates_initialized', 'true');
-          DESIGN_PRESETS.forEach(t => {
-            if (t && t.id && t.id !== 'tpl-anakonda' && t.id !== 'anakonda') {
-              templateMap.set(t.id, t);
-            }
-          });
-        }
-
-        // 2. User's browser local-only templates
-        localTemplates.forEach(t => {
+        systemTemplates.forEach(t => {
           if (t && t.id && t.id !== 'tpl-anakonda' && t.id !== 'anakonda' && t.nameEn?.toLowerCase() !== 'anakonda' && t.nameRu?.toLowerCase() !== 'anakonda') {
             templateMap.set(t.id, t);
           }
@@ -980,36 +987,28 @@ export default function App() {
         const mergedTemplates = Array.from(templateMap.values()).map(cleanTemplateConfig);
         setCustomReadyTemplates(mergedTemplates);
 
-        // Update local storage/IndexedDB with the complete merged set
-        try {
-          localStorage.setItem('nocode_custom_ready_templates', JSON.stringify(mergedTemplates));
-          set('nocode_custom_ready_templates', mergedTemplates).catch(e => console.error(e));
-        } catch (e) {
-          console.warn('localStorage full');
+        const savedUser = await get('nocode_user_templates') ?? localStorage.getItem('nocode_user_templates');
+        let parsedUser = typeof savedUser === 'string' ? JSON.parse(savedUser) : savedUser;
+        if (!Array.isArray(parsedUser)) {
+          parsedUser = [];
         }
 
-        // 4. Proactive Auto-sync: If server returned template list, upload local-only custom templates
-        if (Array.isArray(apiTemplates) && apiTemplates.length > 0) {
-          const apiIds = new Set(apiTemplates.map(t => t.id));
-          const localOnlyCustom = localTemplates.filter(t => t && t.id && !apiIds.has(t.id) && !t.id.startsWith('tpl-'));
-          
-          for (const localTpl of localOnlyCustom) {
+        // Add rescued user templates to user's saved templates, keeping unique IDs
+        if (rescuedUserTemplates.length > 0) {
+          const existingUserIds = new Set(parsedUser.map((t: any) => t.id));
+          const newToAdd = rescuedUserTemplates.filter(t => !existingUserIds.has(t.id)).map(t => ({ ...t, isUserTemplate: true }));
+          if (newToAdd.length > 0) {
+            parsedUser = [...parsedUser, ...newToAdd];
             try {
-              await fetch('/api/custom-ready-templates', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(cleanTemplateConfig(localTpl))
-              });
-              console.log(`Auto-synchronized template to server: ${localTpl.id}`);
-            } catch (syncErr) {
-              console.warn(`Failed to auto-sync template ${localTpl.id} to server`, syncErr);
+              localStorage.setItem('nocode_user_templates', JSON.stringify(parsedUser));
+              set('nocode_user_templates', parsedUser).catch(e => console.error(e));
+            } catch (e) {
+              console.warn('localStorage full during rescue write');
             }
           }
         }
 
-        const savedUser = await get('nocode_user_templates') ?? localStorage.getItem('nocode_user_templates');
-        const parsedUser = typeof savedUser === 'string' ? JSON.parse(savedUser) : savedUser;
-        if (Array.isArray(parsedUser)) setUserTemplates(parsedUser.map(cleanTemplateConfig));
+        setUserTemplates(parsedUser.map(cleanTemplateConfig));
 
       } catch (err) {
         console.error('Failed to load data from storage', err);
@@ -2848,10 +2847,6 @@ export default function App() {
     try {
       const updated = customReadyTemplates.filter(t => t.id !== id);
       setCustomReadyTemplates(updated);
-      set('nocode_custom_ready_templates', updated).catch(e => console.error(e));
-      try {
-        localStorage.setItem('nocode_custom_ready_templates', JSON.stringify(updated));
-      } catch (e) { console.warn('localStorage full'); }
 
       try {
         await fetch(`/api/custom-ready-templates/${id}`, { method: 'DELETE' });
@@ -2868,10 +2863,6 @@ export default function App() {
   const handleUpdateReadyTemplates = async (newTemplates: any[]) => {
     try {
       setCustomReadyTemplates(newTemplates);
-      set('nocode_custom_ready_templates', newTemplates).catch(e => console.error(e));
-      try {
-        localStorage.setItem('nocode_custom_ready_templates', JSON.stringify(newTemplates));
-      } catch (e) { console.warn('localStorage full'); }
 
       try {
         await fetch(`/api/custom-ready-templates`, {
@@ -3024,10 +3015,6 @@ export default function App() {
       const cleaned = cleanTemplateConfig(newTemplate);
       const updated = [...customReadyTemplates, cleaned];
       setCustomReadyTemplates(updated);
-      set('nocode_custom_ready_templates', updated).catch(e => console.error(e));
-      try {
-        localStorage.setItem('nocode_custom_ready_templates', JSON.stringify(updated));
-      } catch (e) { console.warn('localStorage full'); }
 
       try {
         await fetch('/api/custom-ready-templates', {

@@ -353,15 +353,35 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                   <div className="text-[9.5px] uppercase tracking-wider font-mono font-bold text-zinc-400">
                     {lang === 'en' ? "Ready-made Templates" : "Готовые шаблоны"}
                   </div>
-                  {isDevMode && onAddReadyTemplate && (
-                    <button
-                      type="button"
-                      onClick={() => onAddReadyTemplate()}
-                      className="text-[9px] text-amber-600 hover:text-amber-800 font-bold flex items-center gap-0.5 transition-colors px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 rounded border border-amber-200"
-                      title={lang === 'en' ? 'Add Current Style as Ready Template' : 'Добавить текущий стиль в готовые шаблоны'}
-                    >
-                      + {lang === 'en' ? 'Add' : 'Добавить'}
-                    </button>
+                  {isDevMode && (
+                    <div className="flex items-center gap-1.5">
+                      {onAddReadyTemplate && (
+                        <button
+                          type="button"
+                          onClick={() => onAddReadyTemplate()}
+                          className="text-[9px] text-amber-600 hover:text-amber-800 font-bold flex items-center gap-0.5 transition-colors px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 rounded border border-amber-200 cursor-pointer"
+                          title={lang === 'en' ? 'Add Current Style as Ready Template' : 'Добавить текущий стиль в готовые шаблоны'}
+                        >
+                          + {lang === 'en' ? 'Add' : 'Добавить'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(presets, null, 2));
+                          const downloadAnchor = document.createElement('a');
+                          downloadAnchor.setAttribute("href", dataStr);
+                          downloadAnchor.setAttribute("download", "custom_ready_templates.json");
+                          document.body.appendChild(downloadAnchor);
+                          downloadAnchor.click();
+                          downloadAnchor.remove();
+                        }}
+                        className="text-[9px] text-zinc-600 hover:text-zinc-800 font-bold flex items-center gap-0.5 transition-colors px-1.5 py-0.5 bg-zinc-100 hover:bg-zinc-200 rounded border border-zinc-200 cursor-pointer"
+                        title={lang === 'en' ? 'Export custom_ready_templates.json file' : 'Скачать файл готовых шаблонов custom_ready_templates.json'}
+                      >
+                        {lang === 'en' ? 'Export' : 'Экспорт'}
+                      </button>
+                    </div>
                   )}
                 </div>
                 <div className="grid grid-cols-3 gap-2">

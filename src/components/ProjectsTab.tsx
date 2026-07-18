@@ -514,7 +514,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
                         </span>
                       </button>
 
-                      {/* Cover */}
+                      {/* Wide Split (Full) */}
                       <button
                         type="button"
                         onClick={() => setLayout('cover')}
@@ -524,13 +524,19 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
                             : 'bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
                         }`}
                       >
-                        <div className="flex-1 w-full bg-zinc-950/65 rounded-lg overflow-hidden border border-zinc-850/30 flex flex-col items-center">
-                          <div className="w-full h-4 bg-gradient-to-r from-indigo-900 to-pink-900 shrink-0" />
-                          <div className="w-3 h-3 rounded-full bg-zinc-800 border border-zinc-700 shrink-0 -mt-1.5 z-10" />
-                          <div className="w-5 h-1 bg-zinc-700 rounded-full mt-1" />
+                        <div className="flex-1 w-full bg-zinc-950/65 rounded-lg p-1.5 flex items-center justify-between border border-zinc-850/30">
+                          {/* Text elements on left */}
+                          <div className="space-y-1">
+                            <div className="w-7 h-1 bg-zinc-700 rounded-full" />
+                            <div className="w-11 h-0.5 bg-zinc-800 rounded-full" />
+                          </div>
+                          {/* Avatar right side */}
+                          <div className="w-5 h-5 rounded bg-zinc-800 border border-zinc-700 shrink-0 flex items-center justify-center relative overflow-hidden shadow-inner">
+                            <div className="w-2.5 h-2.5 rounded-full bg-indigo-500/40 border border-indigo-500/60" />
+                          </div>
                         </div>
-                        <span className="text-[10px] font-bold block text-center">
-                          {lang === 'en' ? 'Cover (Hero)' : 'Баннер (Hero)'}
+                        <span className="text-[10px] font-bold block text-center truncate">
+                          {lang === 'en' ? 'Wide Split' : 'Широкий сплит'}
                         </span>
                       </button>
                     </div>
