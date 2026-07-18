@@ -10,6 +10,10 @@ export default class WeatherAudioSynthesizer {
   private windGain: GainNode | null = null;
   private thunderGain: GainNode | null = null;
   
+  // Analyser Node
+  private analyser: AnalyserNode | null = null;
+  private connectedElements: Set<HTMLAudioElement> = new Set();
+  
   // Audio Nodes
   private rainNode: AudioWorkletNode | ScriptProcessorNode | null = null;
   private windNode: AudioWorkletNode | ScriptProcessorNode | null = null;
@@ -39,12 +43,18 @@ export default class WeatherAudioSynthesizer {
     try {
       this.ctx = new AudioContextClass();
       
-      // Master output
+      // Analyser for visualization (dedicated to music)
+      this.analyser = this.ctx.createAnalyser();
+      this.analyser.fftSize = 128;
+      this.analyser.connect(this.ctx.destination);
+      (window as any).audioAnalyser = this.analyser; // Global exposure for visualizers
+
+      // Master output - BYPASS ANALYSER for weather
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.setValueAtTime(0.3, this.ctx.currentTime);
       this.masterGain.connect(this.ctx.destination);
 
-      // Dedicated Thunder gain node (independent of masterGain)
+      // Dedicated Thunder gain node - BYPASS ANALYSER for weather
       this.thunderGain = this.ctx.createGain();
       this.thunderGain.gain.setValueAtTime(0.8, this.ctx.currentTime);
       this.thunderGain.connect(this.ctx.destination);
@@ -82,6 +92,30 @@ export default class WeatherAudioSynthesizer {
     } catch (e) {
       console.error("Failed to initialize Web Audio context", e);
       return false;
+    }
+  }
+
+  public getAnalyser(): AnalyserNode | null {
+    if (!this.analyser) this.init();
+    return this.analyser;
+  }
+
+  /**
+   * Connects an HTMLAudioElement (like background music) to the analyzer
+   * for visualization without affecting its playback.
+   */
+  public connectMusicElement(element: HTMLAudioElement): void {
+    this.init();
+    if (!this.ctx || !this.analyser) return;
+    if (this.connectedElements.has(element)) return;
+
+    try {
+      const source = this.ctx.createMediaElementSource(element);
+      source.connect(this.analyser);
+      this.connectedElements.add(element);
+    } catch (e) {
+      // Usually means it's already connected or context is in bad state
+      console.warn("Music element connection to analyser:", e);
     }
   }
 

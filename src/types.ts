@@ -41,6 +41,7 @@ export interface SocialsIconStyle {
   bezelWidth?: number;
   glassZoom?: number;
   glassPreset?: 'convex-circular' | 'convex-smooth' | 'concave' | 'ridge';
+  glassShowSpecular?: boolean;
   enableBlur?: boolean;
   blurAmount?: number;
 }
@@ -201,6 +202,7 @@ export interface Block {
   bezelWidth?: number; // 2 to 60
   glassZoom?: number; // 0 to 100
   glassPreset?: 'convex-circular' | 'convex-smooth' | 'concave' | 'ridge';
+  glassShowSpecular?: boolean;
   
   customShadow?: string;
   enableShadow?: boolean;

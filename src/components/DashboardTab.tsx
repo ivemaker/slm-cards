@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Sparkles,
   ShoppingBag,
+  ShoppingCart,
   DollarSign,
   UtensilsCrossed,
   Layers,
@@ -23,7 +24,8 @@ import {
   Download,
   Copy,
   ExternalLink,
-  Loader2
+  Loader2,
+  Lock
 } from 'lucide-react';
 
 interface DashboardTabProps {
@@ -34,13 +36,47 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ lang }) => {
   const {
     activeProjectId,
     projects,
-    setActiveTab
+    setActiveTab,
+    updateProject
   } = useDev();
 
   const { success: toastSuccess, error: toastError } = useToast();
   const [isQrLoading, setIsQrLoading] = React.useState(true);
 
   const activeProject = projects.find(p => p.id === activeProjectId);
+
+  const [whatsappPhone, setWhatsappPhone] = React.useState(activeProject?.whatsappPhone || '');
+  const [telegramUsername, setTelegramUsername] = React.useState(activeProject?.telegramUsername || '');
+
+  const [showPublishModal, setShowPublishModal] = React.useState(false);
+
+  const handlePublishClick = () => {
+    if (!activeProject) return;
+    setShowPublishModal(true);
+  };
+
+  const handleConfirmPublish = () => {
+    if (activeProjectId) {
+      updateProject(activeProjectId, { hasUnpublishedChanges: false });
+      toastSuccess(lang === 'en' ? 'Project published successfully!' : 'Проект успешно опубликован!');
+    }
+    setShowPublishModal(false);
+  };
+
+  React.useEffect(() => {
+    setWhatsappPhone(activeProject?.whatsappPhone || '');
+    setTelegramUsername(activeProject?.telegramUsername || '');
+  }, [activeProject?.id, activeProject?.whatsappPhone, activeProject?.telegramUsername]);
+
+  const handleSaveOrders = () => {
+    if (activeProjectId) {
+      updateProject(activeProjectId, {
+        whatsappPhone,
+        telegramUsername
+      });
+      toastSuccess(lang === 'en' ? 'Orders settings saved!' : 'Настройки приема заказов сохранены!');
+    }
+  };
 
   React.useEffect(() => {
     setIsQrLoading(true);
@@ -164,9 +200,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ lang }) => {
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
                 activeProject.plan === 'premium'
                   ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                  : activeProject.plan === 'unpaid'
+                  ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
                   : 'bg-zinc-100 text-zinc-500 border-zinc-200'
               }`}>
-                {activeProject.plan === 'premium' ? '👑 Premium' : 'Standard'}
+                {activeProject.plan === 'premium' ? '👑 Premium' : activeProject.plan === 'unpaid' ? 'Unpaid' : 'Standard'}
               </span>
             </div>
             <h2 className="text-2xl font-bold tracking-tight text-zinc-900 mt-1 flex items-center gap-2">
@@ -561,6 +599,66 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ lang }) => {
 
         </div>
 
+        {/* Ecom Orders Section */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-3xl rounded-full pointer-events-none" />
+          <div className="relative z-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+               <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5 text-indigo-500" />
+                  {lang === 'en' ? 'Orders Receiving' : 'Прием заказов'}
+                </h3>
+                <button 
+                  onClick={handleSaveOrders}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] uppercase tracking-wider font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20 active:scale-[0.98]"
+                >
+                  {lang === 'en' ? 'Save Settings' : 'Сохранить настройки'}
+                </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">
+                    {lang === 'en' ? 'WhatsApp Number' : 'Номер WhatsApp'}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center shadow-inner focus-within:border-indigo-500/50 transition-colors">
+                      <input 
+                        type="text" 
+                        value={whatsappPhone}
+                        onChange={(e) => setWhatsappPhone(e.target.value)}
+                        placeholder="79001234567"
+                        className="bg-transparent border-none outline-none text-sm text-zinc-200 font-mono w-full truncate selection:bg-indigo-500/30"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">
+                    {lang === 'en' ? 'Telegram Username' : 'Telegram Username'}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center shadow-inner focus-within:border-indigo-500/50 transition-colors">
+                      <span className="text-zinc-500 font-mono mr-2">@</span>
+                      <input 
+                        type="text" 
+                        value={telegramUsername}
+                        onChange={(e) => setTelegramUsername(e.target.value)}
+                        placeholder="durov"
+                        className="bg-transparent border-none outline-none text-sm text-zinc-200 font-mono w-full truncate selection:bg-indigo-500/30"
+                      />
+                    </div>
+                  </div>
+                </div>
+            </div>
+            <p className="mt-4 text-[13px] text-zinc-400 leading-relaxed">
+              {lang === 'en' 
+                ? 'Enable e-commerce features on your blocks to start receiving orders directly to your messengers.' 
+                : 'Включите функции корзины в настройках блоков (кнопок или товаров), чтобы получать уведомления о заказах напрямую в мессенджеры.'}
+            </p>
+          </div>
+        </div>
+
         {/* Dynamic QR Code & Links section as secondary stats details */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
           
@@ -570,92 +668,194 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ lang }) => {
           {/* Left: Info & Link */}
           <div className="space-y-6 flex-1 w-full relative z-10">
             <div className="space-y-2">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <QrCode className="w-5 h-5 text-indigo-500" />
-                {lang === 'en' ? 'Publish & Share' : 'Публикация проекта'}
-              </h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <QrCode className="w-5 h-5 text-indigo-500" />
+                  {lang === 'en' ? 'Publish & Share' : 'Публикация проекта'}
+                </h3>
+                <button
+                  onClick={handlePublishClick}
+                  disabled={!activeProject?.hasUnpublishedChanges}
+                  className={`px-6 py-2 font-bold rounded-xl text-sm transition-all shadow-lg ${
+                    activeProject?.hasUnpublishedChanges
+                      ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20 active:scale-[0.98]'
+                      : 'bg-zinc-800 text-zinc-500 cursor-not-allowed shadow-none'
+                  }`}
+                >
+                  {lang === 'en' ? 'Publish' : 'Опубликовать'}
+                </button>
+              </div>
               <p className="text-sm text-zinc-400 leading-relaxed max-w-md">
-                {lang === 'en' 
-                  ? 'Your project is live! Share this unique link with your audience or print the QR code for physical locations.' 
-                  : 'Проект опубликован! Делитесь этой ссылкой с аудиторией или используйте QR-код для печатной продукции.'}
+                {activeProject?.hasUnpublishedChanges
+                  ? (lang === 'en' 
+                      ? 'You have unpublished changes. Publish to make them visible.' 
+                      : 'У вас есть неопубликованные изменения. Опубликуйте, чтобы они стали доступны.')
+                  : (lang === 'en' 
+                      ? 'Your project is live! Share this unique link with your audience or print the QR code.' 
+                      : 'Проект опубликован! Делитесь этой ссылкой с аудиторией или используйте QR-код.')}
               </p>
             </div>
 
-            {/* Read-only URL field with Copy button */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider pl-1">
-                {lang === 'en' ? 'Direct Link' : 'Прямая ссылка'}
-              </label>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center shadow-inner">
-                  <input 
-                    type="text" 
-                    readOnly 
-                    value={projectUrl}
-                    className="bg-transparent border-none outline-none text-sm text-zinc-200 font-mono w-full truncate selection:bg-indigo-500/30"
-                  />
+            {activeProject?.plan !== 'unpaid' && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider pl-1">
+                  {lang === 'en' ? 'Direct Link' : 'Прямая ссылка'}
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center shadow-inner">
+                    <input 
+                      type="text" 
+                      readOnly 
+                      value={projectUrl}
+                      className="bg-transparent border-none outline-none text-sm text-zinc-200 font-mono w-full truncate selection:bg-indigo-500/30"
+                    />
+                  </div>
+                  <button 
+                    onClick={handleCopyLink}
+                    title={lang === 'en' ? 'Copy link' : 'Скопировать ссылку'}
+                    className="shrink-0 p-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-600 rounded-xl text-zinc-300 transition-all cursor-pointer group"
+                  >
+                    <Copy className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  </button>
+                  <a 
+                    href={projectUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={lang === 'en' ? 'Open in new tab' : 'Открыть в новой вкладке'}
+                    className="shrink-0 p-3 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 hover:border-indigo-400 rounded-xl text-white transition-all cursor-pointer group shadow-lg shadow-indigo-600/20"
+                  >
+                    <ExternalLink className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  </a>
                 </div>
-                <button 
-                  onClick={handleCopyLink}
-                  title={lang === 'en' ? 'Copy link' : 'Скопировать ссылку'}
-                  className="shrink-0 p-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-600 rounded-xl text-zinc-300 transition-all cursor-pointer group"
-                >
-                  <Copy className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                </button>
-                <a 
-                  href={projectUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={lang === 'en' ? 'Open in new tab' : 'Открыть в новой вкладке'}
-                  className="shrink-0 p-3 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 hover:border-indigo-400 rounded-xl text-white transition-all cursor-pointer group shadow-lg shadow-indigo-600/20"
-                >
-                  <ExternalLink className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                </a>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Right: QR Code Visual & Download */}
-          <div className="shrink-0 flex flex-col sm:flex-row items-center gap-6 bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-2xl relative z-10 w-full md:w-auto">
-            {/* QR Code Canvas/Loader */}
-            <div className="w-36 h-36 rounded-xl bg-zinc-950 border border-white/10 flex items-center justify-center p-2 shadow-inner relative overflow-hidden">
-              {isQrLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-zinc-950 z-10">
-                  <div className="w-full h-full bg-zinc-800 animate-pulse" />
-                  <Loader2 className="absolute w-6 h-6 text-indigo-500 animate-spin" />
-                </div>
-              )}
-              <img 
-                src={qrSrc} 
-                alt="Project QR Code" 
-                className={`w-full h-full object-contain rounded-lg transition-opacity duration-500 ${isQrLoading ? 'opacity-0' : 'opacity-100'}`}
-                onLoad={() => setIsQrLoading(false)}
-                onError={() => setIsQrLoading(false)}
-              />
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-col gap-3 w-full sm:w-auto">
-              <div className="text-center sm:text-left space-y-0.5">
-                <span className="block text-sm font-bold text-zinc-200">
-                  {lang === 'en' ? 'Smart QR Code' : 'Умный QR-код'}
-                </span>
-                <span className="block text-xs text-zinc-500">
-                  {lang === 'en' ? 'High-res • Indigo' : 'Высокое качество'}
-                </span>
+          {activeProject?.plan !== 'unpaid' && (
+            <div className="shrink-0 flex flex-col sm:flex-row items-center gap-6 bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-2xl relative z-10 w-full md:w-auto mt-6 md:mt-0">
+              {/* QR Code Canvas/Loader */}
+              <div className="w-36 h-36 rounded-xl bg-zinc-950 border border-white/10 flex items-center justify-center p-2 shadow-inner relative overflow-hidden">
+                {isQrLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-zinc-950 z-10">
+                    <div className="w-full h-full bg-zinc-800 animate-pulse" />
+                    <Loader2 className="absolute w-6 h-6 text-indigo-500 animate-spin" />
+                  </div>
+                )}
+                <img 
+                  src={qrSrc} 
+                  alt="Project QR Code" 
+                  className={`w-full h-full object-contain rounded-lg transition-opacity duration-500 ${isQrLoading ? 'opacity-0' : 'opacity-100'}`}
+                  onLoad={() => setIsQrLoading(false)}
+                  onError={() => setIsQrLoading(false)}
+                />
               </div>
-              <button 
-                onClick={handleDownloadQr}
-                className="w-full sm:w-auto px-5 py-2.5 bg-zinc-100 hover:bg-white text-zinc-900 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95"
-              >
-                <Download className="w-4 h-4" />
-                {lang === 'en' ? 'Download QR' : 'Скачать QR'}
-              </button>
+
+              {/* Actions */}
+              <div className="flex flex-col gap-3 w-full sm:w-auto">
+                <div className="text-center sm:text-left space-y-0.5">
+                  <span className="block text-sm font-bold text-zinc-200">
+                    {lang === 'en' ? 'Smart QR Code' : 'Умный QR-код'}
+                  </span>
+                  <span className="block text-xs text-zinc-500">
+                    {lang === 'en' ? 'High-res • Indigo' : 'Высокое качество'}
+                  </span>
+                </div>
+                <button 
+                  onClick={handleDownloadQr}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-zinc-100 hover:bg-white text-zinc-900 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95"
+                >
+                  <Download className="w-4 h-4" />
+                  {lang === 'en' ? 'Download QR' : 'Скачать QR'}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
       </div>
+
+      {showPublishModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm" onClick={() => setShowPublishModal(false)} />
+          <div className="relative bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-md w-full shadow-2xl animate-slide-up">
+            <h3 className="text-xl font-bold text-white mb-4">
+              {activeProject?.plan === 'premium' ? (lang === 'en' ? 'Confirm Publication' : 'Подтверждение публикации')
+               : activeProject?.plan === 'unpaid' ? (lang === 'en' ? 'Choose Plan' : 'Выберите тариф')
+               : (lang === 'en' ? 'Confirm Publication' : 'Подтверждение публикации')}
+            </h3>
+            
+            <p className="text-sm text-zinc-400 mb-6 leading-relaxed">
+              {activeProject?.plan === 'premium' ? (
+                lang === 'en' ? 'Are you sure you want to publish your changes? They will be immediately visible to your audience.' : 'Вы уверены, что хотите опубликовать изменения? Они сразу станут доступны вашей аудитории.'
+              ) : activeProject?.plan === 'unpaid' ? (
+                lang === 'en' ? 'You need to upgrade to a Standard or Premium plan to publish this project.' : 'Для публикации проекта необходимо приобрести тариф Стандарт или Премиум.'
+              ) : (
+                lang === 'en' ? 'Publishing with Standard plan will disable some advanced premium animations on your card. Do you want to publish anyway, or upgrade to Premium?' : 'При публикации на тарифе Стандарт некоторые премиальные анимации будут отключены. Опубликовать в любом случае или перейти на Премиум?'
+              )}
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 justify-end">
+              <button
+                onClick={() => setShowPublishModal(false)}
+                className="w-full sm:w-auto px-4 py-2 text-sm font-bold text-zinc-400 hover:text-white transition-colors"
+              >
+                {lang === 'en' ? 'Cancel' : 'Отмена'}
+              </button>
+              
+              {activeProject?.plan === 'unpaid' ? (
+                <>
+                  <button
+                    onClick={() => {
+                      toastSuccess(lang === 'en' ? 'Redirecting to payment...' : 'Перенаправление на оплату...');
+                      setShowPublishModal(false);
+                    }}
+                    className="w-full sm:w-auto px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl text-sm transition-all"
+                  >
+                    {lang === 'en' ? 'Buy Standard' : 'Купить Стандарт'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      toastSuccess(lang === 'en' ? 'Redirecting to payment...' : 'Перенаправление на оплату...');
+                      setShowPublishModal(false);
+                    }}
+                    className="w-full sm:w-auto px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    {lang === 'en' ? 'Buy Premium' : 'Купить Премиум'}
+                  </button>
+                </>
+              ) : activeProject?.plan === 'premium' ? (
+                <button
+                  onClick={handleConfirmPublish}
+                  className="w-full sm:w-auto px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-indigo-600/20"
+                >
+                  {lang === 'en' ? 'Publish' : 'Опубликовать'}
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={handleConfirmPublish}
+                    className="w-full sm:w-auto px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl text-sm transition-all"
+                  >
+                    {lang === 'en' ? 'Publish (Standard)' : 'Опубликовать (Стандарт)'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      toastSuccess(lang === 'en' ? 'Redirecting to payment...' : 'Перенаправление на оплату...');
+                      setShowPublishModal(false);
+                    }}
+                    className="w-full sm:w-auto px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    {lang === 'en' ? 'Upgrade to Premium' : 'Оплатить Премиум'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

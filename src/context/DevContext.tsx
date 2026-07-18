@@ -1,14 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useToast } from './ToastContext';
 
-export type PlanType = 'basic' | 'premium';
+export type PlanType = 'unpaid' | 'basic' | 'premium';
 export type TabType = 'landing' | 'projects' | 'editor' | 'dashboard' | 'preview' | 'settings';
 
 export interface MockProject {
   id: string;
   name: string;
   type: 'personal_card' | 'menu' | 'catalog';
-  plan: 'basic' | 'premium';
+  plan: 'unpaid' | 'basic' | 'premium';
+  tariff: 'Unpaid' | 'Premium' | 'Basic' | 'Standard';
   createdAt: string;
   avatar?: string;
   description?: string;
@@ -16,6 +17,7 @@ export interface MockProject {
   themeStyle: string;
   whatsappPhone?: string;
   telegramUsername?: string;
+  hasUnpublishedChanges?: boolean;
 }
 
 export interface DevContextType {
@@ -66,28 +68,38 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isSaving, setIsSaving] = useState(false);
   const [developerMode, setDeveloperMode] = useState<boolean>(() => getSaved<boolean>('slm_developer_mode', false));
 
-  const [projects, setProjects] = useState<MockProject[]>(() => getSaved<MockProject[]>('slm_projects', [
-    {
-      id: 'demo-card',
-      name: 'Моя Визитка',
-      type: 'personal_card',
-      plan: 'basic',
-      createdAt: new Date().toLocaleDateString('ru-RU'),
-      layout: 'classic',
-      themeStyle: 'cosmic',
-      description: 'Личная интерактивная визитка'
-    },
-    {
-      id: 'demo-menu',
-      name: 'Меню Ресторана',
-      type: 'menu',
-      plan: 'premium',
-      createdAt: new Date().toLocaleDateString('ru-RU'),
-      layout: 'compact',
-      themeStyle: 'sunset',
-      description: 'Официальное меню нашего ресторана'
-    }
-  ]));
+  const [projects, setProjects] = useState<MockProject[]>(() => {
+    const saved = getSaved<any[]>('slm_projects', []);
+    const defaultProjects: MockProject[] = [
+      {
+        id: 'demo-card',
+        name: 'Моя Визитка',
+        type: 'personal_card',
+        plan: 'basic',
+        tariff: 'Basic',
+        createdAt: new Date().toLocaleDateString('ru-RU'),
+        layout: 'classic',
+        themeStyle: 'cosmic',
+        description: 'Личная интерактивная визитка'
+      },
+      {
+        id: 'demo-menu',
+        name: 'Меню Ресторана',
+        type: 'menu',
+        plan: 'premium',
+        tariff: 'Premium',
+        createdAt: new Date().toLocaleDateString('ru-RU'),
+        layout: 'compact',
+        themeStyle: 'sunset',
+        description: 'Официальное меню нашего ресторана'
+      }
+    ];
+    const initial = saved.length > 0 ? saved : defaultProjects;
+    return initial.map(p => ({
+      ...p,
+      tariff: p.tariff || (p.plan === 'premium' ? 'Premium' : 'Basic')
+    })) as MockProject[];
+  });
 
   const firstRender = useRef(true);
 
@@ -114,9 +126,7 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const login = () => {
     setIsAuthenticated(true);
-    setActiveTab('projects');
     localStorage.setItem('slm_auth_status', 'true');
-    localStorage.setItem('slm_active_tab', JSON.stringify('projects'));
     toast.success('Добро пожаловать!');
   };
 
@@ -133,7 +143,11 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setPlanTypeState(newPlan);
     if (activeProjectId) {
       setProjects(prev =>
-        prev.map(p => (p.id === activeProjectId ? { ...p, plan: newPlan } : p))
+        prev.map(p => (p.id === activeProjectId ? { 
+          ...p, 
+          plan: newPlan,
+          tariff: newPlan === 'premium' ? 'Premium' : newPlan === 'unpaid' ? 'Unpaid' : 'Basic'
+        } : p))
       );
     }
   };
@@ -163,6 +177,7 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       name,
       type,
       plan,
+      tariff: plan === 'premium' ? 'Premium' : 'Basic',
       avatar,
       description,
       layout,
@@ -181,7 +196,19 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateProject = (id: string, updates: Partial<MockProject>) => {
-    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    setProjects(prev => prev.map(p => {
+      if (p.id === id) {
+        const merged = { ...p, ...updates };
+        if (updates.hasUnpublishedChanges === undefined) {
+          merged.hasUnpublishedChanges = true;
+        }
+        if (updates.plan) {
+          merged.tariff = updates.plan === 'premium' ? 'Premium' : updates.plan === 'unpaid' ? 'Unpaid' : 'Basic';
+        }
+        return merged;
+      }
+      return p;
+    }));
   };
 
   return (

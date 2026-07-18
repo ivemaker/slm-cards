@@ -5,6 +5,7 @@ import { useToast } from '../context/ToastContext';
 import { 
   Plus, 
   Trash2, 
+  Settings,
   Sparkles, 
   User, 
   UtensilsCrossed, 
@@ -67,7 +68,6 @@ const compressAvatar = (file: File): Promise<string> => {
 export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
   const { 
     projects, 
-    activeProjectId, 
     setActiveProjectId, 
     createProject, 
     deleteProject, 
@@ -86,6 +86,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
   const [avatar, setAvatar] = useState<string>('');
   const [isCompressing, setIsCompressing] = useState(false);
   const [error, setError] = useState('');
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
 
   const openModal = () => {
     setName('');
@@ -117,148 +118,155 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
     setActiveTab('editor');
   };
 
+  const handleOpenAnalytics = (projId: string) => {
+    setActiveProjectId(projId);
+    setActiveTab('dashboard');
+  };
+
   return (
-    <div className="flex-1 w-full px-4 sm:px-6 md:px-8 py-8 animate-fade-in relative z-10 text-white min-h-screen">
-      <div className="mb-8">
-        <h2 className="text-3xl font-extrabold tracking-tight text-white flex items-center gap-2">
-          <Folder className="w-8 h-8 text-indigo-400" />
-          {lang === 'en' ? 'My Projects' : 'Мои Проекты'}
-        </h2>
-        <p className="text-sm text-zinc-400 mt-1.5 max-w-2xl leading-relaxed">
-          {lang === 'en' 
-            ? 'Manage and create your customizable sites, links, and catalogs in Creator Studio.' 
-            : 'Управляйте и создавайте свои интерактивные визитки, меню и каталоги.'}
-        </p>
+    <div className="flex-1 w-full px-6 sm:px-8 md:px-12 py-10 animate-fade-in relative z-10 text-white min-h-full bg-zinc-950">
+      
+      {/* Top Header Section */}
+      <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-900 pb-8">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-400">
+              <Folder className="w-5 h-5 stroke-[1.5]" />
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight text-white font-sans">
+              {lang === 'en' ? 'My Projects' : 'Мои проекты'}
+            </h2>
+          </div>
+          <p className="text-sm text-zinc-500 mt-2 max-w-xl font-normal leading-relaxed">
+            {lang === 'en' 
+              ? 'Manage and design your interactive digital cards, smart menus, and catalog portfolios.' 
+              : 'Управляйте и настраивайте свои интерактивные визитки, меню и каталоги.'}
+          </p>
+        </div>
       </div>
 
       {/* Grid of Projects */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         
-        {/* Step 2: Create new project card button */}
+        {/* Sleek Interactive Create New Project Card - Centered Content */}
         <button
           onClick={openModal}
           id="btn-create-project-trigger"
-          className="group h-[240px] border-2 border-dashed border-zinc-800 hover:border-indigo-500 rounded-xl flex flex-col items-center justify-center transition-all duration-300 bg-zinc-950/20 hover:bg-indigo-950/10 cursor-pointer"
+          className="group h-[210px] border border-dashed border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/15 rounded-2xl flex flex-col items-center justify-center p-6 transition-all duration-300 bg-transparent cursor-pointer text-center relative overflow-hidden"
         >
-          <div className="w-12 h-12 bg-zinc-900 group-hover:bg-indigo-500/20 border border-zinc-800 group-hover:border-indigo-500/30 rounded-full flex items-center justify-center text-zinc-400 group-hover:text-indigo-400 transition-all duration-300 shadow-lg">
-            <Plus className="w-6 h-6" />
+          <div className="w-12 h-12 mb-4 bg-zinc-900/60 border border-zinc-850 group-hover:border-zinc-700 rounded-full flex items-center justify-center text-zinc-500 group-hover:text-zinc-200 group-hover:bg-zinc-900 transition-all duration-300 shadow-sm">
+            <Plus className="w-6 h-6 stroke-[1.5]" />
           </div>
-          <span className="mt-4 text-sm font-semibold text-zinc-400 group-hover:text-indigo-300 transition-colors duration-300">
-            {lang === 'en' ? 'Create New Project' : 'Создать новый проект'}
-          </span>
-          <span className="mt-1 text-xs text-zinc-600 group-hover:text-indigo-400/60 max-w-[200px] text-center px-4">
-            {lang === 'en' ? 'Start from a beautiful template wireframe' : 'Начните с готового профессионального шаблона'}
-          </span>
+          <div>
+            <span className="block text-sm font-semibold text-zinc-400 group-hover:text-zinc-200 transition-colors duration-300">
+              {lang === 'en' ? 'Create New Project' : 'Создать новый проект'}
+            </span>
+            <span className="block mt-2 text-xs text-zinc-600 group-hover:text-zinc-500 max-w-[240px] leading-normal transition-colors duration-300 mx-auto">
+              {lang === 'en' ? 'Choose from our professional layout templates' : 'Начните с готового профессионального шаблона'}
+            </span>
+          </div>
         </button>
 
         {/* Existing Projects */}
         {projects.map((project) => {
-          const isActive = activeProjectId === project.id;
           return (
             <div 
               key={project.id}
               id={`project-card-${project.id}`}
-              className={`h-[240px] bg-zinc-900 border ${isActive ? 'border-indigo-500/80 shadow-indigo-500/5 shadow-2xl' : 'border-zinc-850'} rounded-xl p-5 hover:border-zinc-700 transition-all duration-300 flex flex-col justify-between group relative overflow-hidden`}
+              onClick={() => handleEditProject(project.id)}
+              className="h-[210px] bg-zinc-900/20 backdrop-blur-md border border-zinc-900 hover:border-zinc-800 rounded-2xl p-6 hover:bg-zinc-900/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] transition-all duration-300 flex flex-col justify-between group relative overflow-hidden cursor-pointer"
             >
-              {/* Subtle ambient gradient overlay for active card */}
-              {isActive && (
-                <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
-              )}
-
               {/* Top part of project card */}
               <div>
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-md border ${
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 ${
                       project.type === 'personal_card' 
-                        ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' 
+                        ? 'bg-blue-500/5 border-blue-500/10 text-blue-400' 
                         : project.type === 'menu' 
-                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                        : 'bg-purple-500/10 border-purple-500/20 text-purple-400'
+                        ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-400'
+                        : 'bg-purple-500/5 border-purple-500/10 text-purple-400'
                     }`}>
-                      {project.type === 'personal_card' && <User className="w-5 h-5" />}
-                      {project.type === 'menu' && <UtensilsCrossed className="w-5 h-5" />}
-                      {project.type === 'catalog' && <Layers className="w-5 h-5" />}
+                      {project.type === 'personal_card' && <User className="w-4.5 h-4.5 stroke-[1.5]" />}
+                      {project.type === 'menu' && <UtensilsCrossed className="w-4.5 h-4.5 stroke-[1.5]" />}
+                      {project.type === 'catalog' && <Layers className="w-4.5 h-4.5 stroke-[1.5]" />}
                     </div>
-                    <div>
-                      <h3 className="font-bold text-zinc-100 group-hover:text-white transition-colors line-clamp-1 text-base">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-bold text-zinc-200 group-hover:text-white transition-colors truncate text-base" title={project.name}>
                         {project.name}
                       </h3>
-                      <p className="text-[10px] text-zinc-500 mt-0.5">
+                      <p className="text-[10px] text-zinc-500 mt-0.5 font-mono">
                         {lang === 'en' ? 'Created:' : 'Создан:'} {project.createdAt}
                       </p>
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      deleteProject(project.id);
-                      toastSuccess(lang === 'en' ? 'Project successfully deleted' : 'Проект успешно удален');
-                    }}
-                    id={`btn-delete-project-${project.id}`}
-                    className="text-zinc-500 hover:text-rose-400 transition-colors p-1.5 rounded-lg bg-zinc-950/40 border border-zinc-850 hover:border-rose-950/50"
-                    title={lang === 'en' ? 'Delete Project' : 'Удалить проект'}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {/* Refined Small action buttons (quieter opacity, fully distinct hover) */}
+                  <div className="flex items-center gap-1 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity duration-300">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenAnalytics(project.id);
+                      }}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800/65 border border-transparent hover:border-zinc-800 transition-all"
+                      title={lang === 'en' ? 'Analytics' : 'Аналитика'}
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setProjectToDelete(project.id);
+                      }}
+                      id={`btn-delete-project-${project.id}`}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-950/20 transition-all"
+                      title={lang === 'en' ? 'Delete Project' : 'Удалить проект'}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
+              </div>
 
-                {/* Badges Section */}
-                <div className="flex flex-wrap gap-2 mt-4">
+              {/* Bottom Row: Status Badges & Navigation Action */}
+              <div className="flex items-end justify-between border-t border-zinc-900/50 pt-4">
+                <div className="flex flex-wrap gap-2">
                   {/* Type Badge */}
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                  <span className={`text-[9px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md border ${
                     project.type === 'personal_card'
-                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                      ? 'bg-blue-500/5 text-blue-400 border-blue-500/10'
                       : project.type === 'menu'
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                      : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                      ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/10'
+                      : 'bg-purple-500/5 text-purple-400 border-purple-500/10'
                   }`}>
-                    {project.type === 'personal_card' && (lang === 'en' ? 'Personal Card' : 'Личная визитка')}
+                    {project.type === 'personal_card' && (lang === 'en' ? 'Personal' : 'Визитка')}
                     {project.type === 'menu' && (lang === 'en' ? 'Menu' : 'Меню')}
                     {project.type === 'catalog' && (lang === 'en' ? 'Catalog' : 'Каталог')}
                   </span>
 
                   {/* Plan Badge */}
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
-                    project.plan === 'premium'
-                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/25'
-                      : 'bg-zinc-800 text-zinc-400 border-zinc-750'
-                  }`}>
-                    {project.plan === 'premium' && <Sparkles className="w-3 h-3 text-amber-400" />}
-                    {project.plan === 'premium' 
-                      ? (lang === 'en' ? 'Premium 👑' : 'Премиум 👑') 
-                      : (lang === 'en' ? 'Standard' : 'Стандарт')}
-                  </span>
-
-                  {/* Active Indicator Badge */}
-                  {isActive && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-indigo-500/10 text-indigo-400 border-indigo-500/20 animate-pulse">
-                      {lang === 'en' ? 'Active Editor' : 'Активен в редакторе'}
+                  {project.plan === 'premium' ? (
+                    <span className="relative overflow-hidden text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/15 flex items-center gap-1 select-none">
+                      <Sparkles className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                      {lang === 'en' ? 'Premium' : 'Премиум'}
+                      <span className="absolute inset-0 w-full h-full pointer-events-none">
+                        <span className="absolute inset-y-0 w-4 bg-white/10 blur-[2px] -left-8 animate-shine-ten" />
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md border bg-zinc-900/40 text-zinc-500 border-zinc-850">
+                      {lang === 'en' ? 'Standard' : 'Стандарт'}
                     </span>
                   )}
                 </div>
+
+                {/* Micro hover interaction indicating edit action */}
+                <div className="text-zinc-500 group-hover:text-zinc-200 transition-colors duration-300 flex items-center gap-1 text-xs font-semibold select-none">
+                  <span>{lang === 'en' ? 'Edit' : 'Настроить'}</span>
+                  <ChevronRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition-transform" />
+                </div>
               </div>
 
-              {/* Actions Footer */}
-              <div className="pt-3 border-t border-zinc-850 flex items-center justify-between">
-                <span className="text-[11px] text-zinc-500">
-                  {isActive 
-                    ? (lang === 'en' ? 'Currently editing' : 'Редактируется сейчас') 
-                    : (lang === 'en' ? 'Inactive project' : 'Неактивный проект')}
-                </span>
-                <button
-                  onClick={() => handleEditProject(project.id)}
-                  id={`btn-edit-project-${project.id}`}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                    isActive 
-                      ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/10 border border-indigo-500' 
-                      : 'bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border border-zinc-700'
-                  }`}
-                >
-                  {lang === 'en' ? 'Edit' : 'Редактировать'}
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
             </div>
           );
         })}
@@ -652,6 +660,56 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
               </form>
             </motion.div>
 
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {projectToDelete && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setProjectToDelete(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              className="relative bg-zinc-950 border border-zinc-850 rounded-2xl p-6 shadow-2xl max-w-sm w-full text-center"
+            >
+              <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto mb-4 border border-rose-500/20">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2 tracking-tight">
+                {lang === 'en' ? 'Delete Project?' : 'Удалить проект?'}
+              </h3>
+              <p className="text-sm text-zinc-400 mb-6 leading-relaxed">
+                {lang === 'en' 
+                  ? 'Are you sure you want to delete this project? This action cannot be undone.' 
+                  : 'Вы уверены, что хотите удалить этот проект? Это действие нельзя отменить.'}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setProjectToDelete(null)}
+                  className="flex-1 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-white rounded-xl text-xs uppercase tracking-wider font-bold transition-colors"
+                >
+                  {lang === 'en' ? 'Cancel' : 'Отмена'}
+                </button>
+                <button
+                  onClick={() => {
+                    deleteProject(projectToDelete);
+                    toastSuccess(lang === 'en' ? 'Project deleted' : 'Проект удален');
+                    setProjectToDelete(null);
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs uppercase tracking-wider font-bold shadow-lg shadow-rose-600/20 transition-all active:scale-[0.98]"
+                >
+                  {lang === 'en' ? 'Delete' : 'Удалить'}
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>

@@ -10,6 +10,7 @@
   --animate-gradient-shift: gradientShift 12s ease infinite;
   --animate-gradient-flow-slow: gradientShift 25s ease infinite;
   --animate-shine-sweep: shine-sweep 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  --animate-shine-ten: shine-ten 10s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   --animate-icon-glare: icon-glare 3s ease-in-out infinite;
   --animate-border-glow: border-glow 2s ease-in-out infinite alternate;
   --animate-text-shimmer: text-shimmer var(--text-shimmer-speed, 3s) linear infinite;
@@ -42,6 +43,14 @@
     18% { transform: translateX(180%) skewX(-25deg); opacity: 1; }
     20% { opacity: 0; }
     100% { transform: translateX(180%) skewX(-25deg); opacity: 0; }
+  }
+
+  @keyframes shine-ten {
+    0% { transform: translateX(-150%) skewX(-25deg); opacity: 0; }
+    6% { opacity: 1; }
+    36% { transform: translateX(700%) skewX(-25deg); opacity: 1; }
+    37% { opacity: 0; }
+    100% { transform: translateX(700%) skewX(-25deg); opacity: 0; }
   }
 
   @keyframes border-glow {

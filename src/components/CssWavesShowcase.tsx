@@ -1,11 +1,18 @@
 import React from 'react';
 import { CssWavesSettings } from '../types';
+import { useDev } from '../context/DevContext';
 
 interface CssWavesShowcaseProps {
   settings: CssWavesSettings;
+  forcePause?: boolean;
 }
 
-export default function CssWavesShowcase({ settings }: CssWavesShowcaseProps) {
+export default function CssWavesShowcase({ settings, forcePause }: CssWavesShowcaseProps) {
+  const { planType, projects, activeProjectId } = useDev();
+  const activeProject = projects.find(p => p.id === activeProjectId);
+  const isPremium = activeProject ? activeProject.tariff === 'Premium' : planType === 'premium';
+  const shouldPause = forcePause || !isPremium;
+
   // Внедряем CSS-анимацию бесконечного сдвига в head документа
   React.useEffect(() => {
     const styleId = 'css-waves-keyframes-v4';
@@ -56,6 +63,7 @@ export default function CssWavesShowcase({ settings }: CssWavesShowcaseProps) {
         
         .custom-wave-animate {
           animation: cssWaveMove 10s linear infinite;
+          animation-play-state: inherit;
         }
       `;
       document.head.appendChild(styleElement);
@@ -115,6 +123,7 @@ export default function CssWavesShowcase({ settings }: CssWavesShowcaseProps) {
       style={{
         perspective: `1000px`,
         perspectiveOrigin: '50% 50%',
+        animationPlayState: shouldPause ? 'paused' : 'running',
       }}
     >
       {/* Background container with custom opacity (only affects background, not the waves) */}
@@ -166,6 +175,7 @@ export default function CssWavesShowcase({ settings }: CssWavesShowcaseProps) {
               className="w-full h-full custom-wave-animate"
               style={{
                 animationDuration: `${topDuration}s`,
+                animationPlayState: shouldPause ? 'paused' : 'running',
               }}
             >
               <path d={topPath} fill={settings.topColor} />
@@ -198,6 +208,7 @@ export default function CssWavesShowcase({ settings }: CssWavesShowcaseProps) {
               className="w-full h-full custom-wave-animate"
               style={{
                 animationDuration: `${midDuration}s`,
+                animationPlayState: shouldPause ? 'paused' : 'running',
               }}
             >
               <path d={middlePath} fill={settings.middleColor} />
@@ -230,6 +241,7 @@ export default function CssWavesShowcase({ settings }: CssWavesShowcaseProps) {
               className="w-full h-full custom-wave-animate"
               style={{
                 animationDuration: `${botDuration}s`,
+                animationPlayState: shouldPause ? 'paused' : 'running',
               }}
             >
               <path d={bottomPath} fill={settings.bottomColor} />

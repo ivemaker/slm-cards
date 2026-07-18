@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { useDev } from '../context/DevContext';
 
 interface ChromaLabProps {
   hue?: number;
   opacity?: number;
+  forcePause?: boolean;
 }
 
-export const ChromaLab: React.FC<ChromaLabProps> = ({ hue = 280, opacity = 100 }) => {
+export const ChromaLab: React.FC<ChromaLabProps> = ({ hue = 280, opacity = 100, forcePause }) => {
+  const { planType, projects, activeProjectId } = useDev();
+  const activeProject = projects.find(p => p.id === activeProjectId);
+  const isPremium = activeProject ? activeProject.tariff === 'Premium' : planType === 'premium';
+  const shouldPause = forcePause || !isPremium;
+
   const baseHueStr = hue.toString();
 
   return (
@@ -54,14 +61,17 @@ export const ChromaLab: React.FC<ChromaLabProps> = ({ hue = 280, opacity = 100 }
         .orb-1 {
           background: var(--color-1);
           animation: orbit 12s ease-in-out infinite alternate;
+          animation-play-state: ${shouldPause ? 'paused' : 'running'};
         }
         .orb-2 {
           background: var(--color-2);
           animation: orbit 16s ease-in-out infinite alternate-reverse;
+          animation-play-state: ${shouldPause ? 'paused' : 'running'};
         }
         .orb-3 {
           background: var(--color-3);
           animation: orbit 20s linear infinite;
+          animation-play-state: ${shouldPause ? 'paused' : 'running'};
         }
 
         @keyframes orbit {

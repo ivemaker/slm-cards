@@ -341,7 +341,7 @@ export function normalizeEffectType(type: string): 'css-waves' | 'blob' | 'plasm
   return 'blob';
 }
 
-export function getTextStyles(block: any, isDescription = false): any {
+export function getTextStyles(block: any, isDescription = false, isPremium = true): any {
   const styles: any = {};
   
   const source = (isDescription ? block.descTextStyles : block.titleTextStyles) || block;
@@ -405,13 +405,14 @@ export function getTextStyles(block: any, isDescription = false): any {
     const interval = source.textShimmerInterval || 0;
     const direction = source.textShimmerDirection === 'left' ? 'reverse' : 'normal';
     
+    const playState = isPremium ? 'running' : 'paused';
     if (interval > 0) {
       const totalTime = speed + interval;
       const activePercent = Math.round((speed / totalTime) * 100);
       const animName = `shimmer-anim-${activePercent}`;
-      styles.animation = `${animName} ${totalTime}s linear infinite ${direction}`;
+      styles.animation = `${animName} ${totalTime}s linear infinite ${direction} ${playState}`;
     } else {
-      styles.animation = `text-shimmer ${speed}s linear infinite ${direction}`;
+      styles.animation = `text-shimmer ${speed}s linear infinite ${direction} ${playState}`;
     }
   }
   

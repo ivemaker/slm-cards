@@ -16,8 +16,9 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
   lang,
   configBlocks,
 }) => {
-  const { projects, activeProjectId } = useDev();
+  const { projects, activeProjectId, planType } = useDev();
   const activeProject = projects.find(p => p.id === activeProjectId);
+  const isPremium = activeProject ? (activeProject.tariff === 'Premium') : (planType === 'premium');
   
   const isHeaderSection = configBlocks ? (configBlocks.find(b => b.type === 'profile')?.id === block.id) : true;
   const projectLayout = isHeaderSection ? (activeProject?.layout || 'classic') : 'classic';
@@ -187,7 +188,7 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
           background: `linear-gradient(90deg, rgba(255,255,255,0) 0%, ${profile.avatarShimmerColor ?? '#ffffff'} 50%, rgba(255,255,255,0) 100%)`,
           opacity: 0.8,
           transform: 'rotate(25deg)',
-          animation: `avatar-shimmer-anim-${block.id} ${totalDuration}s infinite linear`,
+          animation: `avatar-shimmer-anim-${block.id} ${totalDuration}s infinite linear ${isPremium ? 'running' : 'paused'}`,
           mixBlendMode: 'screen',
         }}
       />
@@ -506,7 +507,7 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
               ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
               ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
               fontSize: block.customTitleFontSize !== undefined ? `${block.customTitleFontSize}px` : '20px',
-              ...getTextStyles(block, false)
+              ...getTextStyles(block, false, isPremium)
             }}
           >
             {profile.name}
@@ -517,7 +518,7 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
               ...(block.customDescColor ? { color: block.customDescColor } : block.customTextColor ? { color: block.customTextColor } : {}),
               ...(block.customDescFont ? { fontFamily: block.customDescFont } : {}),
               fontSize: block.customDescFontSize !== undefined ? `${block.customDescFontSize}px` : undefined,
-              ...getTextStyles(block, true)
+              ...getTextStyles(block, true, isPremium)
             }}
           >
             {profile.bio}
@@ -545,7 +546,7 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
               ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
               ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
               fontSize: block.customTitleFontSize !== undefined ? `${block.customTitleFontSize}px` : '20px',
-              ...getTextStyles(block, false)
+              ...getTextStyles(block, false, isPremium)
             }}
           >
             {profile.name}
@@ -556,7 +557,7 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
               ...(block.customDescColor ? { color: block.customDescColor } : block.customTextColor ? { color: block.customTextColor } : {}),
               ...(block.customDescFont ? { fontFamily: block.customDescFont } : {}),
               fontSize: block.customDescFontSize !== undefined ? `${block.customDescFontSize}px` : undefined,
-              ...getTextStyles(block, true)
+              ...getTextStyles(block, true, isPremium)
             }}
           >
             {profile.bio}

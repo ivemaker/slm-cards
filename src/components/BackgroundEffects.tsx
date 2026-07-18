@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { BgEffect } from '../types';
 import { normalizeEffectType } from '../utils';
+import { useDev } from '../context/DevContext';
 import { CosmicPlasmaNebula } from './CosmicPlasmaNebula';
 import { ChromaLab } from './ChromaLab';
 import FlatWaves from './FlatWaves';
@@ -35,6 +36,11 @@ export const BackgroundEffects = React.memo<BackgroundEffectsProps>(({ effects, 
     width: typeof window !== 'undefined' ? window.innerWidth : 1920, 
     height: typeof window !== 'undefined' ? window.innerHeight : 1080 
   });
+
+  const { planType, projects, activeProjectId } = useDev();
+  const activeProject = projects.find(p => p.id === activeProjectId);
+  const isPremium = activeProject ? activeProject.tariff === 'Premium' : planType === 'premium';
+  const effectivePause = forcePause || !isPremium;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -85,7 +91,7 @@ export const BackgroundEffects = React.memo<BackgroundEffectsProps>(({ effects, 
                 effect={effect} 
                 bgImage={bgImage} 
                 isMenuOpen={isMenuOpen} 
-                forcePause={forcePause} 
+                forcePause={effectivePause} 
                 scrollOffset={type === 'clouds-3d' ? scrollOffset : 0} 
               />
             );
@@ -162,6 +168,7 @@ const EffectItem = React.memo<{ effect: BgEffect; bgImage?: string; isMenuOpen?:
           bottomWavelength: effect.cssWavesBottomWavelength !== undefined ? effect.cssWavesBottomWavelength : 4,
           opacity: opacity,
         }}
+        forcePause={forcePause}
       />
     );
   }
@@ -189,7 +196,7 @@ const EffectItem = React.memo<{ effect: BgEffect; bgImage?: string; isMenuOpen?:
   }
 
   if (type === 'chroma-lab') {
-    return <ChromaLab hue={effect.hue} opacity={opacity} />;
+    return <ChromaLab hue={effect.hue} opacity={opacity} forcePause={forcePause} />;
   }
 
   if (type === 'plasma') {

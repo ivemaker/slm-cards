@@ -78,9 +78,11 @@ export const BlockInspector: React.FC<BlockInspectorProps> = ({
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-1 shrink-0 ${
               activeProject.plan === 'premium'
                 ? 'bg-amber-500/10 text-amber-400 border-amber-500/25'
+                : activeProject.plan === 'unpaid'
+                ? 'bg-rose-500/10 text-rose-400 border-rose-500/25'
                 : 'bg-zinc-800 text-zinc-450 border-zinc-700'
             }`}>
-              {activeProject.plan === 'premium' ? '👑 Premium' : 'Standard'}
+              {activeProject.plan === 'premium' ? '👑 Premium' : activeProject.plan === 'unpaid' ? 'Unpaid' : 'Standard'}
             </span>
           </div>
         )}
@@ -203,9 +205,11 @@ export const BlockInspector: React.FC<BlockInspectorProps> = ({
           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-1 shrink-0 ${
             activeProject.plan === 'premium'
               ? 'bg-amber-500/10 text-amber-400 border-amber-500/25'
+              : activeProject.plan === 'unpaid'
+              ? 'bg-rose-500/10 text-rose-400 border-rose-500/25'
               : 'bg-zinc-800 text-zinc-450 border-zinc-700'
           }`}>
-            {activeProject.plan === 'premium' ? '👑 Premium' : 'Standard'}
+            {activeProject.plan === 'premium' ? '👑 Premium' : activeProject.plan === 'unpaid' ? 'Unpaid' : 'Standard'}
           </span>
         </div>
       )}

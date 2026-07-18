@@ -334,36 +334,29 @@ export const MainBgInspector: React.FC<MainBgInspectorProps> = ({
               'cyber-lines', 'vector-forms', 'research-network', 'geo-shapes',
               'floating-cubes', 'clouds-3d'
             ].includes(val);
-            if (isPremium && planType === 'basic') {
-              toastError(lang === 'en' 
-                ? "👑 This effect is only available for Premium plans. Upgrade the plan in Dev Tools to enable!"
-                : "👑 Этот эффект доступен только для Premium проектов. Переключите тариф проекта на Premium в панели разработчика для тестирования!"
-              );
-              return;
-            }
             handleEffectTypeChange(idx, effect, val as any);
           }}
           className="w-full bg-zinc-900 border border-zinc-800 text-[10px] rounded p-1 text-white focus:outline-none cursor-pointer"
         >
-          <option value="css-waves">👑 🌊 {lang === 'en' ? 'Procedural 3D Waves' : 'Процедурные 3D-волны'}</option>
+          <option value="css-waves">🌊 {lang === 'en' ? 'Procedural 3D Waves' : 'Процедурные 3D-волны'}</option>
           <option value="blob">🫧 {lang === 'en' ? 'Organic Blobs' : 'Органические капли'}</option>
           <option value="plasma">🌌 {lang === 'en' ? 'Cosmic Plasma' : 'Космическая плазма'}</option>
           <option value="chroma-lab">🧪 {lang === 'en' ? 'Chroma Lab' : 'Хрома Лаб'}</option>
           <option value="flat-waves">🔮 {lang === 'en' ? '3D Low-Poly Waves' : '3D Волны'}</option>
-          <option value="bezier-waves">👑 ➰ {lang === 'en' ? 'Bezier Waves' : 'Кривые Безье'}</option>
-          <option value="liquid-ripples">👑 🌊 {lang === 'en' ? 'Interactive Waves' : 'Интерактивные волны'}</option>
-          <option value="origami-ribbon">👑 🎗️ {lang === 'en' ? 'Origami Ribbon' : 'Бумажная лента'}</option>
-          <option value="webgl-polylines">👑 ⚡ {lang === 'en' ? 'WebGL Lines' : 'WebGL Линии'}</option>
-          <option value="neon-stream">👑 🌌 {lang === 'en' ? 'Neon Stream' : 'Неоновый поток'}</option>
+          <option value="bezier-waves">➰ {lang === 'en' ? 'Bezier Waves' : 'Кривые Безье'}</option>
+          <option value="liquid-ripples">🌊 {lang === 'en' ? 'Interactive Waves' : 'Интерактивные волны'}</option>
+          <option value="origami-ribbon">🎗️ {lang === 'en' ? 'Origami Ribbon' : 'Бумажная лента'}</option>
+          <option value="webgl-polylines">⚡ {lang === 'en' ? 'WebGL Lines' : 'WebGL Линии'}</option>
+          <option value="neon-stream">🌌 {lang === 'en' ? 'Neon Stream' : 'Неоновый поток'}</option>
           <option value="stars">✨ {lang === 'en' ? 'Stars' : 'Звезды'}</option>
-          <option value="webgl-metaballs">👑 🟢 {lang === 'en' ? 'WebGL Metaballs' : 'Органические метасферы'}</option>
-          <option value="cyber-lines">👑 🚥 {lang === 'en' ? 'Cyber Lines' : 'Киберлинии'}</option>
-          <option value="noise-topography">👑 ⛰️ {lang === 'en' ? 'Noise Topography' : 'Рельефная топография'}</option>
-          <option value="vector-forms">👑 📐 {lang === 'en' ? 'Vector Forms' : 'Векторные формы'}</option>
-          <option value="research-network">👑 🕸️ {lang === 'en' ? 'Research Network' : 'Информационная сеть'}</option>
-          <option value="geo-shapes">👑 📐 {lang === 'en' ? 'Geo Shapes' : 'Геометрические примитивы'}</option>
-          <option value="floating-cubes">👑 📦 {lang === 'en' ? 'Floating Cubes' : 'Парящие CSS 3D кубы'}</option>
-          <option value="clouds-3d">👑 ☁️ {lang === 'en' ? 'Clouds 3D' : 'Облака 3D'}</option>
+          <option value="webgl-metaballs">🟢 {lang === 'en' ? 'WebGL Metaballs' : 'Органические метасферы'}</option>
+          <option value="cyber-lines">🚥 {lang === 'en' ? 'Cyber Lines' : 'Киберлинии'}</option>
+          <option value="noise-topography">⛰️ {lang === 'en' ? 'Noise Topography' : 'Рельефная топография'}</option>
+          <option value="vector-forms">📐 {lang === 'en' ? 'Vector Forms' : 'Векторные формы'}</option>
+          <option value="research-network">🕸️ {lang === 'en' ? 'Research Network' : 'Информационная сеть'}</option>
+          <option value="geo-shapes">📐 {lang === 'en' ? 'Geo Shapes' : 'Геометрические примитивы'}</option>
+          <option value="floating-cubes">📦 {lang === 'en' ? 'Floating Cubes' : 'Парящие CSS 3D кубы'}</option>
+          <option value="clouds-3d">☁️ {lang === 'en' ? 'Clouds 3D' : 'Облака 3D'}</option>
         </select>
       </div>
     );
@@ -590,7 +583,7 @@ export const MainBgInspector: React.FC<MainBgInspectorProps> = ({
           </label>
           <button
             onClick={() => {
-              const defaultType = planType === 'basic' ? 'blob' : 'css-waves';
+              const defaultType = 'css-waves';
               const newEffect: BgEffect = {
                 id: Math.random().toString(36).substr(2, 9),
                 type: defaultType,

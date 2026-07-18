@@ -440,9 +440,10 @@ function generateLightning(width: number, height: number, strikeX: number): Ligh
 
 interface RainOfArthurPageProps {
   children?: React.ReactNode;
+  onAnalyserReady?: (analyser: AnalyserNode) => void;
 }
 
-export default function RainOfArthurPage({ children }: RainOfArthurPageProps) {
+export default function RainOfArthurPage({ children, onAnalyserReady }: RainOfArthurPageProps) {
   const { developerMode } = useDev();
   // Theme & Preset State
   const [activePreset, setActivePreset] = useState<WeatherPreset>(PRESETS[4]); // Start with SUNNY per request (сначала сухое стекло)
@@ -527,9 +528,12 @@ export default function RainOfArthurPage({ children }: RainOfArthurPageProps) {
     // Initialize background music
     const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
     const audioPath = `${window.location.origin}${base}/FOREST.mp3`;
-    backgroundMusicRef.current = new Audio(audioPath);
-    backgroundMusicRef.current.loop = true;
-    backgroundMusicRef.current.volume = 0.7; // Subtle
+    const audio = new Audio();
+    audio.crossOrigin = "anonymous";
+    audio.src = audioPath;
+    audio.loop = true;
+    audio.volume = 0.7; // Subtle
+    backgroundMusicRef.current = audio;
 
     return () => {
       if (backgroundMusicRef.current) {
@@ -542,6 +546,10 @@ export default function RainOfArthurPage({ children }: RainOfArthurPageProps) {
   useEffect(() => {
     if (backgroundMusicRef.current) {
       if (isMusicEnabled) {
+        // Connect to analyser for visualizer
+        if (synthRef.current) {
+          synthRef.current.connectMusicElement(backgroundMusicRef.current);
+        }
         backgroundMusicRef.current.play().catch(e => console.error("Audio play failed:", e));
       } else {
         backgroundMusicRef.current.pause();
@@ -558,14 +566,21 @@ export default function RainOfArthurPage({ children }: RainOfArthurPageProps) {
     try {
       const ext = grozaExtensionsRef.current[type];
       const filePath = `/${type}.${ext}`;
+      
+      // Use synthRef for high-performance routed playback if available
+      if (synthRef.current && isAudioEnabled) {
+        // Intrinsic scaling matching original logic
+        const intrinsicVol = type === 'groza1' ? 0.675 : 1.0;
+        synthRef.current.playFile(filePath, intrinsicVol * volume * masterVolume);
+        return;
+      }
+
+      // Fallback for non-WebAudio or disabled audio (legacy)
       const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
       const actualPath = `${window.location.origin}${base}${filePath}`;
-      
       const audio = new Audio(actualPath);
-      // Perfect volume scaling combining the file's relative volume, chosen thunderVolume (volume argument), and masterVolume
       const intrinsicVol = type === 'groza1' ? 0.675 : 1.0;
       audio.volume = intrinsicVol * volume * masterVolume;
-      
       audio.play().catch((err) => {
         console.warn(`HTML5 Audio play failed for ${type}:`, err);
       });
@@ -635,6 +650,10 @@ export default function RainOfArthurPage({ children }: RainOfArthurPageProps) {
 
     // Lazy initialization of Audio Synth
     synthRef.current = new WeatherAudioSynthesizer();
+    if (onAnalyserReady) {
+      const analyser = synthRef.current.getAnalyser();
+      if (analyser) onAnalyserReady(analyser);
+    }
 
     // Interaction Lock Protocol: unlock audio context on first user pointerdown interaction
     const handleUnlockAudio = () => {
@@ -1808,6 +1827,19 @@ export default function RainOfArthurPage({ children }: RainOfArthurPageProps) {
       }
     }, 15);
   };
+
+  // Listen for custom trigger-lightning event (e.g. from logo clicks)
+  useEffect(() => {
+    const handleCustomTrigger = () => {
+      if (triggerManualLightningRef.current) {
+        triggerManualLightningRef.current(true);
+      }
+    };
+    window.addEventListener('trigger-lightning', handleCustomTrigger);
+    return () => {
+      window.removeEventListener('trigger-lightning', handleCustomTrigger);
+    };
+  }, []);
 
   // Hotkeys (Space for lightning, 1..7 for phase jump)
   useEffect(() => {

@@ -35,11 +35,7 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
   const profile = focusedBlock.profileContent!;
 
   const handlePremiumClick = (e: React.MouseEvent) => {
-    if (planType === 'basic') {
-      e.preventDefault();
-      e.stopPropagation();
-      alert("👑 Этот эффект доступен только для Premium проектов. Переключите тариф проекта на Premium в панели разработчика для тестирования!");
-    }
+    // Unlocked for all plans
   };
 
   const isSvgOrPng = profile.avatar?.startsWith('data:image/svg') || 
@@ -524,21 +520,17 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
             </span>
             <div 
               onClickCapture={handlePremiumClick}
-              className={`bg-zinc-950/30 p-2 rounded-lg border border-zinc-850/50 space-y-1.5 transition-all duration-200 ${
-                planType === 'basic' ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              className="bg-zinc-950/30 p-2 rounded-lg border border-zinc-850/50 space-y-1.5 transition-all duration-200"
             >
               <div className="flex items-center justify-between">
                 <span className="text-[9px] font-semibold text-zinc-300 flex items-center">
                   {lang === 'en' ? 'Backlight Glow' : 'Свечение за иконкой'}
-                  <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded ml-1.5 font-bold">PRO</span>
                 </span>
                 <input
                   type="checkbox"
                   checked={profile.avatarGlowEnabled === true}
                   onChange={(e) => updateProfileContent({ avatarGlowEnabled: e.target.checked })}
-                  disabled={planType === 'basic'}
-                  className="w-3 h-3 text-emerald-600 bg-zinc-950 rounded cursor-pointer disabled:cursor-not-allowed"
+                  className="w-3 h-3 text-emerald-600 bg-zinc-950 rounded cursor-pointer"
                 />
               </div>
               {profile.avatarGlowEnabled && (
@@ -552,8 +544,7 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
                         max={80}
                         value={profile.avatarGlowRadius ?? 20}
                         onChange={(e) => updateProfileContent({ avatarGlowRadius: parseInt(e.target.value, 10) })}
-                        disabled={planType === 'basic'}
-                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer disabled:cursor-not-allowed"
+                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer"
                       />
                       <span className="block font-mono text-zinc-400 text-right">{profile.avatarGlowRadius ?? 20}px</span>
                     </div>
@@ -566,8 +557,7 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
                         max={100}
                         value={profile.avatarGlowIntensity ?? 50}
                         onChange={(e) => updateProfileContent({ avatarGlowIntensity: parseInt(e.target.value, 10) })}
-                        disabled={planType === 'basic'}
-                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer disabled:cursor-not-allowed"
+                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer"
                       />
                       <span className="block font-mono text-zinc-400 text-right">{profile.avatarGlowIntensity ?? 50}%</span>
                     </div>
@@ -580,8 +570,7 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
                         type="color"
                         value={profile.avatarGlowColor ?? '#6366f1'}
                         onChange={(e) => updateProfileContent({ avatarGlowColor: e.target.value })}
-                        disabled={planType === 'basic'}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       />
                       <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: profile.avatarGlowColor ?? '#6366f1' }} />
                     </div>
@@ -595,18 +584,17 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
               onClickCapture={handlePremiumClick}
               className={`bg-zinc-950/30 p-2 rounded-lg border border-zinc-850/50 space-y-1.5 transition-all duration-200 ${
                 isSvgOrPng ? 'opacity-50 pointer-events-none' : ''
-              } ${planType === 'basic' ? 'opacity-50 cursor-not-allowed' : ''}`}
+              }`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-[9px] font-semibold text-zinc-300 flex items-center">
                   {lang === 'en' ? 'Running Sheen' : 'Пробегающий блик'}
-                  <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded ml-1.5 font-bold">PRO</span>
                 </span>
                 <input
                   type="checkbox"
                   checked={profile.avatarShimmerEnabled === true}
                   onChange={(e) => updateProfileContent({ avatarShimmerEnabled: e.target.checked })}
-                  disabled={isSvgOrPng || planType === 'basic'}
+                  disabled={isSvgOrPng}
                   className="w-3 h-3 text-emerald-600 bg-zinc-950 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -622,8 +610,7 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
                         step={0.1}
                         value={profile.avatarShimmerSpeed ?? 2.0}
                         onChange={(e) => updateProfileContent({ avatarShimmerSpeed: parseFloat(e.target.value) })}
-                        disabled={planType === 'basic'}
-                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer disabled:cursor-not-allowed"
+                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer"
                       />
                       <span className="block font-mono text-zinc-400 text-right">{profile.avatarShimmerSpeed ?? 2.0}s</span>
                     </div>
@@ -637,8 +624,7 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
                         step={0.5}
                         value={profile.avatarShimmerInterval ?? 3.0}
                         onChange={(e) => updateProfileContent({ avatarShimmerInterval: parseFloat(e.target.value) })}
-                        disabled={planType === 'basic'}
-                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer disabled:cursor-not-allowed"
+                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer"
                       />
                       <span className="block font-mono text-zinc-400 text-right">{profile.avatarShimmerInterval ?? 3.0}s</span>
                     </div>
@@ -654,8 +640,7 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
                         step={5}
                         value={profile.avatarShimmerWidth ?? 30}
                         onChange={(e) => updateProfileContent({ avatarShimmerWidth: parseInt(e.target.value, 10) })}
-                        disabled={planType === 'basic'}
-                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer disabled:cursor-not-allowed"
+                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer"
                       />
                       <span className="block font-mono text-zinc-400 text-right">{profile.avatarShimmerWidth ?? 30}%</span>
                     </div>
@@ -668,8 +653,7 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
                             type="color"
                             value={profile.avatarShimmerColor ?? '#ffffff'}
                             onChange={(e) => updateProfileContent({ avatarShimmerColor: e.target.value })}
-                            disabled={planType === 'basic'}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                           />
                           <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: profile.avatarShimmerColor ?? '#ffffff' }} />
                         </div>
@@ -685,18 +669,17 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
               onClickCapture={handlePremiumClick}
               className={`bg-zinc-950/30 p-2 rounded-lg border border-zinc-850/50 space-y-1.5 transition-all duration-200 ${
                 isSvgOrPng ? 'opacity-50 pointer-events-none' : ''
-              } ${planType === 'basic' ? 'opacity-50 cursor-not-allowed' : ''}`}
+              }`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-[9px] font-semibold text-zinc-300 flex items-center">
                   {lang === 'en' ? 'Glass Overlay' : 'Стекло с бликом'}
-                  <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded ml-1.5 font-bold">PRO</span>
                 </span>
                 <input
                   type="checkbox"
                   checked={profile.avatarGlassEnabled === true}
                   onChange={(e) => updateProfileContent({ avatarGlassEnabled: e.target.checked })}
-                  disabled={isSvgOrPng || planType === 'basic'}
+                  disabled={isSvgOrPng}
                   className="w-3 h-3 text-emerald-600 bg-zinc-950 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -707,8 +690,7 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
                     <select
                       value={profile.avatarGlassType ?? 'dome'}
                       onChange={(e) => updateProfileContent({ avatarGlassType: e.target.value as any })}
-                      disabled={planType === 'basic'}
-                      className="w-full bg-zinc-900 border border-zinc-800 text-[10px] rounded p-1 text-white cursor-pointer disabled:cursor-not-allowed"
+                      className="w-full bg-zinc-900 border border-zinc-800 text-[10px] rounded p-1 text-white cursor-pointer"
                     >
                       <option value="dome">{lang === 'en' ? '3D Spherical Dome' : '3D Сферический купол'}</option>
                       <option value="retro">{lang === 'en' ? 'Retro Gloss (Web 2.0)' : 'Ретро-глянец (Web 2.0)'}</option>
@@ -726,8 +708,7 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
                         max={100}
                         value={profile.avatarGlassOpacity ?? 40}
                         onChange={(e) => updateProfileContent({ avatarGlassOpacity: parseInt(e.target.value, 10) })}
-                        disabled={planType === 'basic'}
-                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer disabled:cursor-not-allowed"
+                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer"
                       />
                       <span className="block font-mono text-zinc-400 text-right">{profile.avatarGlassOpacity ?? 40}%</span>
                     </div>
@@ -740,8 +721,7 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
                         max={100}
                         value={profile.avatarGlassReflectIntensity ?? 60}
                         onChange={(e) => updateProfileContent({ avatarGlassReflectIntensity: parseInt(e.target.value, 10) })}
-                        disabled={planType === 'basic'}
-                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer disabled:cursor-not-allowed"
+                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer"
                       />
                       <span className="block font-mono text-zinc-400 text-right">{profile.avatarGlassReflectIntensity ?? 60}%</span>
                     </div>
@@ -756,8 +736,7 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
                         max={20}
                         value={profile.avatarGlassBlur ?? 0}
                         onChange={(e) => updateProfileContent({ avatarGlassBlur: parseInt(e.target.value, 10) })}
-                        disabled={planType === 'basic'}
-                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer disabled:cursor-not-allowed"
+                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer"
                       />
                       <span className="block font-mono text-zinc-400 text-right">{profile.avatarGlassBlur ?? 0}px</span>
                     </div>
@@ -770,8 +749,7 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
                         max={360}
                         value={profile.avatarGlassAngle ?? 0}
                         onChange={(e) => updateProfileContent({ avatarGlassAngle: parseInt(e.target.value, 10) })}
-                        disabled={planType === 'basic'}
-                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer disabled:cursor-not-allowed"
+                        className="w-full accent-emerald-500 bg-zinc-800 h-1 rounded-lg cursor-pointer"
                       />
                       <span className="block font-mono text-zinc-400 text-right">{profile.avatarGlassAngle ?? 0}°</span>
                     </div>
@@ -784,8 +762,7 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
                         type="color"
                         value={profile.avatarGlassColor ?? '#ffffff'}
                         onChange={(e) => updateProfileContent({ avatarGlassColor: e.target.value })}
-                        disabled={planType === 'basic'}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       />
                       <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: profile.avatarGlassColor ?? '#ffffff' }} />
                     </div>

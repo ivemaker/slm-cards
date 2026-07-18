@@ -533,10 +533,13 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                             />
                           ) : (
                             <span 
-                              className="text-[9px] font-semibold text-zinc-750 truncate w-full block cursor-text"
+                              className="text-[9px] font-semibold text-zinc-800 truncate w-full block cursor-text"
                               title={isDevMode ? "Double-click to rename" : ""}
                             >
-                              {lang === 'en' ? (preset.nameEn || preset.nameRu) : (preset.nameRu || preset.nameEn)}
+                              {(() => {
+                                const name = lang === 'en' ? (preset.nameEn || preset.nameRu) : (preset.nameRu || preset.nameEn);
+                                return name.length > 30 ? name.slice(0, 27) + '...' : name;
+                              })()}
                             </span>
                           )}
                         </div>
@@ -637,8 +640,11 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                           </div>
 
                           {/* Name */}
-                          <span className="text-[9px] font-semibold text-zinc-750 truncate w-full mt-1.5 block">
-                            {tpl.nameEn || tpl.nameRu}
+                          <span className="text-[9px] font-semibold text-zinc-800 truncate w-full mt-1.5 block">
+                            {(() => {
+                              const name = tpl.nameEn || tpl.nameRu;
+                              return name.length > 30 ? name.slice(0, 27) + '...' : name;
+                            })()}
                           </span>
                         </div>
                       );

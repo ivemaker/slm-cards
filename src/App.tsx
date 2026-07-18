@@ -105,6 +105,7 @@ import { SettingsTab } from './components/SettingsTab';
 import { useToast } from './context/ToastContext';
 import { AuthModal } from './components/AuthModal';
 import RainOfArthurPage from './rain_effect/RainOfArthurPage';
+import Landing from './components/Landing';
 
 import { 
   compressImage, 
@@ -132,7 +133,7 @@ const STYLE_KEYS = [
   'enableGlareEffect', 'glareEffectSpeed', 'glareEffectColor',
   'enableGlowEffect', 'glowEffectColor', 'glowEffectSpeed',
   'enableNoiseEffect', 'noiseEffectOpacity',
-  'enableGlassEffect', 'glassThickness', 'refractiveIndex', 'bezelWidth', 'glassZoom', 'glassPreset',
+  'enableGlassEffect', 'glassThickness', 'refractiveIndex', 'bezelWidth', 'glassZoom', 'glassPreset', 'glassShowSpecular',
   'borderGlowActive', 'borderGlowColor', 'borderGlowWidth', 'borderGlowOpacity',
   'borderCornerGlowActive', 'borderCornerColorTL', 'borderCornerColorTR', 'borderCornerColorBL', 'borderCornerColorBR',
   'borderCornerLength', 'borderCornerStroke', 'borderCornerGlowSpread', 'borderCornerGlowOpacity',
@@ -722,7 +723,9 @@ export default function App() {
   }
 
   // Navigation tabs: 'landing' | 'projects' | 'editor' | 'dashboard' | 'preview'
-  const { isAuthenticated, login, logout, planType, activeTab, setActiveTab, activeProjectId, projects, developerMode } = useDev();
+  const { isAuthenticated, login, logout, planType, activeTab, setActiveTab, activeProjectId, projects, developerMode, updateProject } = useDev();
+  const activeProjectForPremiumCheck = projects.find(p => p.id === activeProjectId);
+  const isPremium = activeProjectForPremiumCheck ? (activeProjectForPremiumCheck.tariff === 'Premium') : (planType === 'premium');
   const toast = useToast();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
@@ -1664,6 +1667,11 @@ export default function App() {
       }));
     }
     setConfigs(newConfigs);
+    
+    if (activeProjectId && !skipHistory) {
+      updateProject(activeProjectId, { hasUnpublishedChanges: true });
+    }
+
     set('nocode_cfg_business', newConfigs.business).catch(e => console.error('IDB save error', e));
     set('nocode_cfg_restaurant', newConfigs.restaurant).catch(e => console.error('IDB save error', e));
     set('nocode_cfg_catalog', newConfigs.catalog).catch(e => console.error('IDB save error', e));
@@ -1695,84 +1703,8 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    if (planType === 'basic' && isDataLoaded) {
-      const premiumBgTypes = [
-        'css-waves', 'bezier-waves', 'webgl-metaballs', 'noise-topography',
-        'liquid-ripples', 'origami-ribbon', 'webgl-polylines', 'neon-stream',
-        'cyber-lines', 'vector-forms', 'research-network', 'geo-shapes',
-        'floating-cubes', 'clouds-3d'
-      ];
-      
-      const cleanBlockRecursive = (b: Block): Block => {
-        const cleaned: Block = { ...b };
-        if (cleaned.enableGlareEffect) cleaned.enableGlareEffect = false;
-        if (cleaned.enableGlowEffect) cleaned.enableGlowEffect = false;
-        if (cleaned.enableNoiseEffect) cleaned.enableNoiseEffect = false;
-        if (cleaned.enableGlassEffect) cleaned.enableGlassEffect = false;
-        
-        if (cleaned.type === 'profile' && cleaned.profileContent) {
-          cleaned.profileContent = {
-            ...cleaned.profileContent,
-            avatarGlowEnabled: false,
-            avatarShimmerEnabled: false,
-            avatarGlassEnabled: false
-          };
-        }
-        
-        if (cleaned.type === 'group' && cleaned.groupContent) {
-          cleaned.groupContent = {
-            ...cleaned.groupContent,
-            blocks: cleaned.groupContent.blocks.map(cleanBlockRecursive)
-          };
-        }
-        return cleaned;
-      };
-
-      const updatedConfigs = JSON.parse(JSON.stringify(configs));
-      let mutated = false;
-
-      (Object.keys(updatedConfigs) as Array<'business' | 'restaurant' | 'catalog'>).forEach((key) => {
-        const cfg = updatedConfigs[key];
-        let cfgMutated = false;
-        
-        const mainBg = cfg.mainBg;
-        if (mainBg) {
-          const themes: Array<'lightConfig' | 'darkConfig'> = ['lightConfig', 'darkConfig'];
-          themes.forEach(tKey => {
-            const themeCfg = mainBg[tKey];
-            if (themeCfg && themeCfg.effects) {
-              const cleanedEffects = themeCfg.effects.map((eff: any) => {
-                if (premiumBgTypes.includes(eff.type)) {
-                  cfgMutated = true;
-                  return { ...eff, type: 'blob' as any };
-                }
-                return eff;
-              });
-              themeCfg.effects = cleanedEffects;
-            }
-          });
-        }
-        
-        if (cfg.blocks) {
-          const originalBlocksJson = JSON.stringify(cfg.blocks);
-          const cleanedBlocks = cfg.blocks.map(cleanBlockRecursive);
-          if (JSON.stringify(cleanedBlocks) !== originalBlocksJson) {
-            cfg.blocks = cleanedBlocks;
-            cfgMutated = true;
-          }
-        }
-        
-        if (cfgMutated) {
-          mutated = true;
-        }
-      });
-
-      if (mutated) {
-        saveToLocalStorage(updatedConfigs, true);
-      }
-    }
-  }, [planType, isDataLoaded]);
+  // Automatic downgrades/resets on plan changes are now removed.
+  // Premium background/styling configs remain intact but render in freeze-frame mode on basic.
 
   const showToast = (msg: string) => {
     toast.success(msg);
@@ -3936,6 +3868,7 @@ export default function App() {
               bezelWidth={block.bezelWidth !== undefined ? block.bezelWidth : 35}
               glassZoom={block.glassZoom !== undefined ? block.glassZoom : 30}
               glassPreset={block.glassPreset || 'convex-circular'}
+              glassShowSpecular={block.glassShowSpecular !== false}
             />
           )}
 
@@ -3985,11 +3918,11 @@ export default function App() {
               {/* Glare Shine */}
               {block.enableGlareEffect && (
                 <div 
-                  className="absolute inset-0 z-20 pointer-events-none animate-shine-sweep"
+                  className="absolute inset-0 z-20 pointer-events-none"
                   style={{
                     borderRadius: 'inherit',
-                    animationDuration: `${block.glareEffectSpeed !== undefined ? block.glareEffectSpeed : 4}s`,
                     backgroundImage: `linear-gradient(90deg, transparent, ${block.glareEffectColor || '#ffffff'}35 50%, transparent)`,
+                    animation: `shine-sweep ${block.glareEffectSpeed !== undefined ? block.glareEffectSpeed : 4}s cubic-bezier(0.4, 0, 0.2, 1) infinite ${isPremium ? 'running' : 'paused'}`,
                   }}
                 />
               )}
@@ -4268,6 +4201,7 @@ export default function App() {
                         bezelWidth={bezelWidth}
                         glassZoom={glassZoom}
                         glassPreset={glassPreset}
+                        glassShowSpecular={block.glassShowSpecular !== false}
                       />
                     </div>
                   )}
@@ -4291,10 +4225,10 @@ export default function App() {
                       style={{ borderRadius: borderRadiusValue }}
                     >
                       <span 
-                        className="absolute -inset-full pointer-events-none rotate-45 transform animate-icon-glare"
+                        className="absolute -inset-full pointer-events-none rotate-45 transform"
                         style={{
                           background: `linear-gradient(90deg, transparent, ${glareColor}50, transparent)`,
-                          animationDuration: `${glareSpeed}s`,
+                          animation: `icon-glare ${glareSpeed}s ease-in-out infinite ${isPremium ? 'running' : 'paused'}`,
                         }}
                       />
                     </div>
@@ -4435,7 +4369,7 @@ export default function App() {
                     ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
                     ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
                     fontSize: block.customTitleFontSize !== undefined ? `${block.customTitleFontSize}px` : '16px',
-                    ...getTextStyles(block, false)
+                    ...getTextStyles(block, false, isPremium)
                   }}
                 >
                   {block.textContent.title}
@@ -4448,7 +4382,7 @@ export default function App() {
                     ...(block.customDescColor ? { color: block.customDescColor } : block.customTextColor ? { color: block.customTextColor } : {}),
                     ...(block.customDescFont ? { fontFamily: block.customDescFont } : {}),
                     fontSize: block.customDescFontSize !== undefined ? `${block.customDescFontSize}px` : undefined,
-                    ...getTextStyles(block, true)
+                    ...getTextStyles(block, true, isPremium)
                   }}
                 >
                   {block.textContent.body}
@@ -4474,7 +4408,7 @@ export default function App() {
                     ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
                     ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
                     ...(block.customTitleFontSize ? { fontSize: `${block.customTitleFontSize}px` } : {}),
-                    ...getTextStyles(block, false)
+                    ...getTextStyles(block, false, isPremium)
                   }}
                   className={`
                     inline-block w-full py-2.5 px-4 font-medium text-xs tracking-tight transition-transform active:scale-[0.98]
@@ -4496,7 +4430,7 @@ export default function App() {
                     ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
                     ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
                     ...(block.customTitleFontSize ? { fontSize: `${block.customTitleFontSize}px` } : {}),
-                    ...getTextStyles(block, false)
+                    ...getTextStyles(block, false, isPremium)
                   }}
                   className={`
                     inline-block w-full py-2.5 px-4 font-medium text-xs tracking-tight transition-transform active:scale-[0.98]
@@ -4531,7 +4465,7 @@ export default function App() {
                       ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
                       ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
                       fontSize: block.customTitleFontSize !== undefined ? `${block.customTitleFontSize}px` : '12px',
-                      ...getTextStyles(block, false)
+                      ...getTextStyles(block, false, isPremium)
                     }}
                   >
                     {block.catalogItemContent.title}
@@ -4541,7 +4475,7 @@ export default function App() {
                     style={{
                       ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
                       ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
-                      ...getTextStyles(block, false)
+                      ...getTextStyles(block, false, isPremium)
                     }}
                   >
                     {formatPrice(block.catalogItemContent.price, lang)}
@@ -4554,7 +4488,7 @@ export default function App() {
                     ...(block.customDescFont ? { fontFamily: block.customDescFont } : {}),
                     fontSize: block.customDescFontSize !== undefined ? `${block.customDescFontSize}px` : undefined,
                     opacity: 0.85,
-                    ...getTextStyles(block, true)
+                    ...getTextStyles(block, true, isPremium)
                   }}
                 >
                   {block.catalogItemContent.description}
@@ -4602,7 +4536,7 @@ export default function App() {
                   ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
                   ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
                   fontSize: block.customTitleFontSize !== undefined ? `${block.customTitleFontSize}px` : '12px',
-                  ...getTextStyles(block, false)
+                  ...getTextStyles(block, false, isPremium)
                 }}
               >
                 {block.categoryHeaderContent.title}
@@ -5077,8 +5011,8 @@ export default function App() {
       )}
       {/* TOP BAR / THE CREATOR NAV */}
       {activeTab !== 'preview' && (
-        <header id="top_bar" className="sticky top-0 z-40 bg-zinc-950 text-white border-b border-zinc-800/80">
-          <div className="w-full px-4 sm:px-6 md:px-8 h-16 flex items-center justify-between gap-4">
+        <header id="top_bar" className="fixed top-0 left-0 right-0 h-16 z-40 bg-zinc-950 text-white border-b border-zinc-800/80">
+          <div className="relative w-full px-4 sm:px-6 md:px-8 h-16 flex items-center justify-between gap-4">
             
               {/* Left Side: Logo Brand */}
               <div className="flex items-center gap-6">
@@ -5087,54 +5021,61 @@ export default function App() {
                     setActiveTab('landing');
                     setIsBurgerMenuOpen(false);
                   }}
-                  className="flex items-center gap-3 cursor-pointer group select-none"
+                  className="flex items-center cursor-pointer select-none"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform">
-                    <span className="text-white font-mono font-black text-lg tracking-tighter">S</span>
-                  </div>
-                  <div>
-                    <h1 className="text-sm font-black tracking-tight text-white leading-none group-hover:text-indigo-455 transition-colors">SLM Cards</h1>
-                    <p className="text-[9px] text-zinc-500 font-mono tracking-wider uppercase mt-1 leading-none">
-                      {lang === 'en' ? 'NO-CODE PLATFORM' : 'NO-CODE ПЛАТФОРМА'}
-                    </p>
-                  </div>
+                  <img
+                    src="/SLM cards logo.svg"
+                    alt="SLM Cards"
+                    className="h-8 w-auto object-contain transition-none transform-none hover:scale-100 active:scale-100"
+                    style={{ filter: 'brightness(0) invert(1)' }}
+                    referrerPolicy="no-referrer"
+                  />
                 </div>
               </div>
 
-            {/* Center Side: Tab Switcher (My Projects and Editor) */}
-            {isAuthenticated && (
-              <nav className="hidden md:flex items-center space-x-1 bg-zinc-900/60 p-1 rounded-xl border border-zinc-800/50">
+            {/* Center Side: Breadcrumbs and Preview */}
+            {isAuthenticated && activeTab !== 'projects' && (
+              <nav className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center space-x-2 bg-zinc-900/60 p-1 rounded-xl border border-zinc-800/50 z-10">
                 <button
                   id="tab_projects"
                   onClick={() => {
                     setActiveTab('projects');
                     setIsBurgerMenuOpen(false);
                   }}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                    activeTab === 'projects' 
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 
-                      : 'text-zinc-400 hover:text-white hover:bg-zinc-850/50'
-                  }`}
+                  className="px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer text-zinc-400 hover:text-white hover:bg-zinc-850/50"
                 >
                   <FolderOpen size={14} />
-                  <span>{lang === 'en' ? 'My Projects' : 'Мои проекты'}</span>
+                  <span>
+                    {lang === 'en' ? 'My Projects' : 'Мои проекты'}
+                    {activeTab === 'editor' && activeProjectId && (
+                      <>
+                        <span className="mx-2 text-zinc-600 font-normal">/</span>
+                        <span className="text-zinc-200" title={projects.find(p => p.id === activeProjectId)?.name || 'Project'}>
+                          {(() => {
+                            const name = projects.find(p => p.id === activeProjectId)?.name || 'Project';
+                            return name.length > 30 ? name.slice(0, 27) + '...' : name;
+                          })()}
+                        </span>
+                      </>
+                    )}
+                  </span>
                 </button>
 
-                <button
-                  id="tab_editor"
-                  onClick={() => {
-                    setActiveTab('editor');
-                    setIsBurgerMenuOpen(false);
-                  }}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                    activeTab === 'editor' 
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 
-                      : 'text-zinc-400 hover:text-white hover:bg-zinc-850/50'
-                  }`}
-                >
-                  <Sliders size={14} />
-                  <span>{lang === 'en' ? 'Editor' : 'Редактор'}</span>
-                </button>
+                {activeTab === 'editor' && activeProjectId && (
+                  <button
+                    onClick={() => {
+                      setActiveTab('preview');
+                      // Simulate views growth
+                      updateConfigField('views', config.views + 1);
+                      setIsBurgerMenuOpen(false);
+                    }}
+                    className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                    title={lang === 'en' ? 'Open Public Preview' : 'Открыть публичный просмотр'}
+                  >
+                    <Eye size={14} />
+                    <span>{lang === 'en' ? 'Preview' : 'Просмотр'}</span>
+                  </button>
+                )}
               </nav>
             )}
 
@@ -5142,7 +5083,7 @@ export default function App() {
             <div className="flex items-center gap-2 sm:gap-3">
               
               {/* Active Project Info Widget (Subtle badge) */}
-              {isAuthenticated && activeProjectId && (
+              {isAuthenticated && activeProjectId && activeTab !== 'editor' && activeTab !== 'projects' && activeTab !== 'landing' && (
                 <div className="hidden lg:flex items-center gap-2 bg-zinc-900/40 border border-zinc-800/60 px-3 py-1.5 rounded-lg text-xs">
                   <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
                   <span className="text-zinc-400 max-w-[120px] truncate">
@@ -5152,7 +5093,7 @@ export default function App() {
               )}
 
               {/* 👁️ PUBLIC PREVIEW BUTTON (Highly Prominent!) */}
-              {isAuthenticated && activeProjectId && (
+              {isAuthenticated && activeProjectId && activeTab !== 'editor' && activeTab !== 'projects' && activeTab !== 'landing' && (
                 <button
                   onClick={() => {
                     setActiveTab('preview');
@@ -5299,19 +5240,6 @@ export default function App() {
                             <FolderOpen size={14} className="shrink-0" />
                             <span>{lang === 'en' ? 'My Projects' : 'Мои проекты'}</span>
                           </button>
-
-                          <button
-                            onClick={() => {
-                              setActiveTab('editor');
-                              setIsBurgerMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left cursor-pointer ${
-                              activeTab === 'editor' ? 'bg-indigo-600 text-white' : 'text-zinc-300 hover:bg-zinc-800'
-                            }`}
-                          >
-                            <Sliders size={14} className="shrink-0" />
-                            <span>{lang === 'en' ? 'Editor' : 'Редактор'}</span>
-                          </button>
                           
                           <div className="h-px bg-zinc-800/60 my-1" />
                         </div>
@@ -5332,19 +5260,6 @@ export default function App() {
 
                       {isAuthenticated ? (
                         <>
-                          <button
-                            onClick={() => {
-                              setActiveTab('dashboard');
-                              setIsBurgerMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
-                              activeTab === 'dashboard' ? 'bg-zinc-800 text-indigo-400' : 'text-zinc-300 hover:bg-zinc-800'
-                            }`}
-                          >
-                            <TrendingUp size={14} className="text-zinc-400 shrink-0" />
-                            <span>{lang === 'en' ? 'Statistics & Analytics' : 'Статистика и аналитика'}</span>
-                          </button>
-
                           <button
                             onClick={() => {
                               setActiveTab('settings');
@@ -5421,8 +5336,18 @@ export default function App() {
 
       {/* RENDER MASTER CONTENT VIEWS */}
       {activeTab !== 'preview' ? (
-        <div className="min-h-screen bg-zinc-50 flex flex-col text-zinc-900 font-sans">
-          <main className="flex-1 flex flex-col relative bg-zinc-50">
+        <div className={`h-screen pt-16 flex flex-col font-sans overflow-hidden ${
+          activeTab === 'projects' || activeTab === 'editor' || activeTab === 'landing' 
+            ? 'bg-zinc-950 text-white' 
+            : 'bg-zinc-50 text-zinc-900'
+        }`}>
+          <main className={`flex-1 flex flex-col relative ${
+            activeTab === 'editor' ? 'overflow-hidden' : 'overflow-y-auto'
+          } ${
+            activeTab === 'projects' || activeTab === 'editor' || activeTab === 'landing' 
+              ? 'bg-zinc-950 text-white' 
+              : 'bg-zinc-50 text-zinc-900'
+          }`}>
 
         {/* 1. THE CREATOR WORKSPACE (EDITOR TAB) */}
         {isAuthenticated && activeTab === 'editor' && activeProjectId === null ? (
@@ -5930,77 +5855,12 @@ export default function App() {
 
         {/* LANDING TAB */}
         {(!isAuthenticated || activeTab === 'landing') && (
-          <RainOfArthurPage>
-            <div className="w-full flex flex-col items-center py-12 sm:py-20 px-4 sm:px-6 md:px-8 text-center relative min-h-[calc(100vh-64px)] z-0">
-              {/* Top region: Logo centered between top and headline */}
-              <div className="flex-1 w-full flex items-center justify-center relative z-10">
-                <img 
-                  src="/SLM%20cards%20logo.svg" 
-                  alt="SLM Cards Logo" 
-                  className="h-16 w-auto opacity-90 drop-shadow-2xl"
-                  style={{ filter: 'brightness(0) invert(1)' }}
-                />
-              </div>
-
-              <div className="max-w-4xl mx-auto space-y-12 relative z-10 flex flex-col items-center">
-                {/* Header Title */}
-                <div className="space-y-8 max-w-2xl flex flex-col items-center">
-                  <div className="space-y-4">
-                    <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
-                      {lang === 'en' 
-                        ? 'Create Stunning Digital Cards & Micro-Landings' 
-                        : 'Создавайте стильные цифровые визитки и микролендинги'}
-                    </h2>
-                    <p className="text-sm sm:text-base text-zinc-300 leading-relaxed drop-shadow-md">
-                      {lang === 'en'
-                        ? 'The ultimate responsive builder with glass effects, 3D overlays, instant QR code distribution, and order catalogs. No coding required.'
-                        : 'Профессиональный адаптивный конструктор с эффектами стекла, 3D фонами, мгновенной генерацией QR-кодов и каталогами заказов. Без единой строчки кода.'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Interactive CTA buttons */}
-                <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-md justify-center">
-                  <button
-                    onClick={() => {
-                      if (!isAuthenticated) {
-                        setIsAuthModalOpen(true);
-                      } else {
-                        setActiveTab('projects');
-                      }
-                    }}
-                    className="w-full sm:w-auto px-12 py-5 backdrop-blur-2xl hover:bg-white/5 text-white font-bold text-sm rounded-none transition-all active:scale-95 cursor-pointer flex items-center justify-center pointer-events-auto"
-                  >
-                    <span>{lang === 'en' ? 'CREATE PROJECT' : 'СОЗДАТЬ ПРОЕКТ'}</span>
-                  </button>
-                </div>
-
-                {/* BENTO GRID / FEATURES HIGHLIGHT */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 w-full pt-12 text-center pointer-events-auto">
-                  {[
-                    {
-                      title: lang === 'en' ? 'Dynamic Layouts' : 'Умные эффекты',
-                    },
-                    {
-                      title: lang === 'en' ? '100% Adaptive' : '100% Адаптивность',
-                    },
-                    {
-                      title: lang === 'en' ? 'Real-Time Stats' : 'Аналитика кликов',
-                    },
-                    {
-                      title: lang === 'en' ? 'Order Catalogs' : 'Каталог продуктов',
-                    }
-                  ].map((item, idx) => (
-                    <div key={idx} className="flex flex-col items-center">
-                      <h4 className="text-xs font-bold text-white tracking-[0.2em] uppercase opacity-70">{item.title}</h4>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {/* Bottom region: Equal spacer to keep center content centered */}
-              <div className="flex-1 w-full" />
-            </div>
-          </RainOfArthurPage>
+          <Landing 
+            lang={lang} 
+            isAuthenticated={isAuthenticated} 
+            setIsAuthModalOpen={setIsAuthModalOpen} 
+            setActiveTab={setActiveTab} 
+          />
         )}
         {/* PROJECTS TAB */}
         {isAuthenticated && activeTab === 'projects' && (

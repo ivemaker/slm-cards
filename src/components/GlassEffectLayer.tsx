@@ -11,6 +11,7 @@ interface GlassEffectLayerProps {
   bezelWidth: number;
   glassZoom?: number;
   glassPreset?: 'convex-circular' | 'convex-smooth' | 'concave' | 'ridge';
+  glassShowSpecular?: boolean;
 }
 
 export const GlassEffectLayer: React.FC<GlassEffectLayerProps> = ({
@@ -21,6 +22,7 @@ export const GlassEffectLayer: React.FC<GlassEffectLayerProps> = ({
   bezelWidth = 35,
   glassZoom = 30,
   glassPreset = 'convex-circular',
+  glassShowSpecular = true,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dispUrl, setDispUrl] = useState<string>('');
@@ -241,26 +243,6 @@ export const GlassEffectLayer: React.FC<GlassEffectLayerProps> = ({
                 preserveAspectRatio="none" 
                 result="disp" 
               />
-              {/* Extract Blue channel (Height map) to Alpha channel for 3D Specural highlights */}
-              <feColorMatrix 
-                in="disp"
-                type="matrix"
-                values="0 0 0 0 0
-                        0 0 0 0 0
-                        0 0 0 0 0
-                        0 0 1 0 0"
-                result="height"
-              />
-              {/* Compute beautiful 3D glossy light highlights on top-left borders */}
-              <feSpecularLighting 
-                in="height" 
-                specularExponent="45" 
-                specularConstant="1.5" 
-                lightingColor="#ffffff" 
-                result="specular"
-              >
-                <feDistantLight azimuth="225" elevation="55" />
-              </feSpecularLighting>
               {/* Refract the background behind the card based on R/G slopes */}
               <feDisplacementMap 
                 in="SourceGraphic" 
@@ -268,20 +250,6 @@ export const GlassEffectLayer: React.FC<GlassEffectLayerProps> = ({
                 scale={displacementScale} 
                 xChannelSelector="R" 
                 yChannelSelector="G" 
-                result="refracted"
-              />
-              {/* Clip specular highlights to only show inside the glass boundaries */}
-              <feComposite 
-                in="specular" 
-                in2="height" 
-                operator="in" 
-                result="specularCut" 
-              />
-              {/* Compositing specular light nicely on top of refracted layout */}
-              <feBlend 
-                in="specularCut" 
-                in2="refracted" 
-                mode="screen" 
               />
             </filter>
           </defs>
@@ -325,7 +293,8 @@ export const GlassRefractorWrapper: React.FC<{
   bezelWidth: number;
   glassZoom?: number;
   glassPreset?: 'convex-circular' | 'convex-smooth' | 'concave' | 'ridge';
-}> = ({ blockId, borderRadius, glassThickness, refractiveIndex, bezelWidth, glassZoom, glassPreset }) => {
+  glassShowSpecular?: boolean;
+}> = ({ blockId, borderRadius, glassThickness, refractiveIndex, bezelWidth, glassZoom, glassPreset, glassShowSpecular }) => {
   return (
     <div className="absolute inset-0 z-[5] overflow-visible" style={{ borderRadius: 'inherit' }}>
       <GlassEffectLayer
@@ -336,6 +305,7 @@ export const GlassRefractorWrapper: React.FC<{
         bezelWidth={bezelWidth}
         glassZoom={glassZoom}
         glassPreset={glassPreset}
+        glassShowSpecular={glassShowSpecular}
       />
     </div>
   );

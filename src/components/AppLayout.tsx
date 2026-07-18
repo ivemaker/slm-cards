@@ -68,13 +68,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, lang, setLang })
       requiresProject: true,
     },
     {
-      id: 'dashboard' as const,
-      labelEn: 'Analytics',
-      labelRu: 'Статистика',
-      icon: TrendingUp,
-      disabled: false,
-    },
-    {
       id: 'settings' as const,
       labelEn: 'Settings',
       labelRu: 'Настройки',
@@ -89,16 +82,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, lang, setLang })
       {/* SIDEBAR FOR DESKTOP */}
       <aside className="hidden md:flex flex-col w-64 bg-zinc-950 text-white border-r border-zinc-800 shrink-0 z-30">
         {/* BRAND HEADER */}
-        <div className="p-6 border-b border-zinc-900 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <span className="text-white font-mono font-black text-lg tracking-tighter">S</span>
-          </div>
-          <div>
-            <h1 className="text-sm font-black tracking-tight text-white leading-none">SLM Cards</h1>
-            <p className="text-[10px] text-zinc-500 font-mono tracking-wider uppercase mt-1">
-              {lang === 'en' ? 'NO-CODE PLATFORM' : 'NO-CODE ПЛАТФОРМА'}
-            </p>
-          </div>
+        <div className="p-6 border-b border-zinc-900 flex items-center justify-start">
+          <img
+            src="/SLM cards logo.svg"
+            alt="SLM Cards"
+            className="h-8 w-auto object-contain"
+            style={{ filter: 'brightness(0) invert(1)' }}
+            referrerPolicy="no-referrer"
+          />
         </div>
 
         {/* ACTIVE PROJECT BADGE */}
@@ -114,9 +105,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, lang, setLang })
               <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
                 activeProject.plan === 'premium' 
                   ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
+                  : activeProject.plan === 'unpaid'
+                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                   : 'bg-zinc-850 text-zinc-400 border border-zinc-800'
               }`}>
-                {activeProject.plan === 'premium' ? 'Premium' : 'Basic'}
+                {activeProject.plan === 'premium' ? 'Premium' : activeProject.plan === 'unpaid' ? 'Unpaid' : 'Standard'}
               </span>
             </div>
           ) : (
@@ -211,11 +204,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, lang, setLang })
       {/* MOBILE HEADER & BOTTOM NAV */}
       <div className="flex md:hidden flex-col w-full bg-zinc-950 text-white z-30">
         <div className="px-4 py-3 border-b border-zinc-900 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg">
-              <span className="text-white font-mono font-black text-sm">S</span>
-            </div>
-            <span className="text-sm font-bold tracking-tight">SLM Cards</span>
+          <div className="flex items-center">
+            <img
+              src="/SLM cards logo.svg"
+              alt="SLM Cards"
+              className="h-7 w-auto object-contain"
+              style={{ filter: 'brightness(0) invert(1)' }}
+              referrerPolicy="no-referrer"
+            />
           </div>
 
           <div className="flex items-center gap-3">

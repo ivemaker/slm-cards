@@ -99,11 +99,23 @@ export const DevPanel: React.FC = () => {
             <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
               Тарифный план
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setPlanType('unpaid')}
+                className={`py-1.5 px-3 rounded-lg text-[10px] font-semibold transition-all duration-200 cursor-pointer ${
+                  planType === 'unpaid'
+                    ? 'bg-rose-600 text-white shadow-md'
+                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-750 hover:text-zinc-200'
+                }`}
+                id="dev-btn-plan-unpaid"
+              >
+                Unpaid
+              </button>
               <button
                 type="button"
                 onClick={() => setPlanType('basic')}
-                className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                className={`py-1.5 px-3 rounded-lg text-[10px] font-semibold transition-all duration-200 cursor-pointer ${
                   planType === 'basic'
                     ? 'bg-purple-600 text-white shadow-md'
                     : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-750 hover:text-zinc-200'
@@ -115,14 +127,14 @@ export const DevPanel: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setPlanType('premium')}
-                className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                className={`py-1.5 px-3 rounded-lg text-[10px] font-semibold transition-all duration-200 cursor-pointer ${
                   planType === 'premium'
-                    ? 'bg-purple-600 text-white shadow-md'
+                    ? 'bg-amber-600 text-white shadow-md'
                     : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-750 hover:text-zinc-200'
                 }`}
                 id="dev-btn-plan-premium"
               >
-                👑 Premium
+                Premium
               </button>
             </div>
           </div>
