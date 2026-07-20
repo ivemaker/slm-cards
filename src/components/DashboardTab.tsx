@@ -37,7 +37,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ lang }) => {
     activeProjectId,
     projects,
     setActiveTab,
-    updateProject
+    updateProject,
+    getProjectUrl
   } = useDev();
 
   const { success: toastSuccess, error: toastError } = useToast();
@@ -82,13 +83,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ lang }) => {
     setIsQrLoading(true);
   }, [activeProject?.id, activeProject?.type]);
 
-  const typeMap: Record<string, string> = {
-    personal_card: 'card',
-    menu: 'menu',
-    catalog: 'catalog'
-  };
-  const pathPrefix = activeProject ? (typeMap[activeProject.type] || 'card') : 'card';
-  const projectUrl = activeProject ? `https://slm.cards/${pathPrefix}/${activeProject.id}` : '';
+  const projectUrl = activeProject ? getProjectUrl(activeProject) : '';
 
   const qrColor = '6366f1'; 
   const qrBgColor = '1e1b4b'; 

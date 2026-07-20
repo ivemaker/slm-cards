@@ -129,36 +129,40 @@ export const RESTAURANT_TPL_BLOCKS: Block[] = [
   },
   {
     id: 'r3',
-    type: 'catalog-item',
+    type: 'dish',
     padding: 'medium',
     bgColor: 'bg-white border border-stone-100',
     textColor: 'text-stone-900',
     borderRadius: 'lg',
     borderColor: 'border-stone-100',
     borderWidth: 'thin',
-    catalogItemContent: {
-      id: 'ramen-1',
-      image: PLACEHOLDERS.ramen,
-      title: 'Black Garlic Tonkotsu',
-      description: 'Slow-simmered rich pork bone broth, black garlic oil, hand-rolled chashu pork belly, bamboo shoots, and perfectly marinated soft egg.',
-      price: 18.5
+    dishContent: {
+      id: 'dish-1',
+      name: 'Фирменный бургер',
+      description: 'Сочная котлета из мраморной говядины, хрустящий бекон, чеддер и наш фирменный соус на пышной булочке.',
+      price: 16.0,
+      weight: '350 г',
+      image: '/misty_rainy_forest_1781780284992.jpg',
+      images: ['/misty_rainy_forest_1781780284992.jpg']
     }
   },
   {
     id: 'r4',
-    type: 'catalog-item',
+    type: 'dish',
     padding: 'medium',
     bgColor: 'bg-white border border-stone-100',
     textColor: 'text-stone-900',
     borderRadius: 'lg',
     borderColor: 'border-stone-100',
     borderWidth: 'thin',
-    catalogItemContent: {
-      id: 'ramen-2',
-      image: PLACEHOLDERS.gourmetBurger,
-      title: 'Spicy Miso Burger Special',
-      description: 'Japanese Wagyu beef patty drenched in traditional spicy chili miso paste, pickled daikon radish, and crispy panko onions on toasted brioche.',
-      price: 16.0
+    dishContent: {
+      id: 'dish-2',
+      name: 'Классический Цезарь',
+      description: 'Хрустящие листья романо, сочная куриная грудка-гриль, золотистые гренки, тертый пармезан и наш фирменный соус.',
+      price: 12.5,
+      weight: '250 г',
+      image: '/misty_rainy_forest_1781780284992.jpg',
+      images: ['/misty_rainy_forest_1781780284992.jpg']
     }
   },
   {
@@ -176,19 +180,21 @@ export const RESTAURANT_TPL_BLOCKS: Block[] = [
   },
   {
     id: 'r6',
-    type: 'catalog-item',
+    type: 'dish',
     padding: 'medium',
     bgColor: 'bg-white border border-stone-100',
     textColor: 'text-stone-900',
     borderRadius: 'lg',
     borderColor: 'border-stone-100',
     borderWidth: 'thin',
-    catalogItemContent: {
-      id: 'ramen-3',
-      image: PLACEHOLDERS.coffee,
-      title: 'Ceremonial Stone-Ground Matcha',
-      description: 'Uji-harvested ceremonial matcha frothed with organic oat milk and a touch of wild wildflower honey.',
-      price: 6.5
+    dishContent: {
+      id: 'dish-3',
+      name: 'Церемониальный Матча-Латте',
+      description: 'Органический японский чай матча, взбитый с нежным овсяным молоком и каплей меда диких цветов.',
+      price: 6.5,
+      weight: '250 мл',
+      image: '/misty_rainy_forest_1781780284992.jpg',
+      images: ['/misty_rainy_forest_1781780284992.jpg']
     }
   }
 ];
@@ -224,53 +230,42 @@ export const CATALOG_TPL_BLOCKS: Block[] = [
   },
   {
     id: 'c3',
-    type: 'catalog-item',
+    type: 'product',
     padding: 'medium',
     bgColor: 'bg-zinc-50 border border-zinc-100',
     textColor: 'text-zinc-900',
     borderRadius: 'md',
     borderColor: 'border-zinc-100',
     borderWidth: 'thin',
-    catalogItemContent: {
-      id: 'cat-1',
-      image: PLACEHOLDERS.bag,
-      title: 'Raw Felt Minimal Tote',
-      description: 'Hand stitched industrial felt, structured carry handles, and vegetable-dyed Italian vachetta leather pocket. Water repellent.',
-      price: 145.0
+    productContent: {
+      id: 'prod-1',
+      name: 'Кроссовки Urban Runner',
+      description: 'Дышащие кроссовки для бега и повседневной носки с технологией амортизации.',
+      price: 110.0,
+      oldPrice: 150.0,
+      buttonText: 'Купить',
+      image: '/misty_rainy_forest_1781780284992.jpg',
+      images: ['/misty_rainy_forest_1781780284992.jpg']
     }
   },
   {
     id: 'c4',
-    type: 'catalog-item',
+    type: 'product',
     padding: 'medium',
     bgColor: 'bg-zinc-50 border border-zinc-100',
     textColor: 'text-zinc-900',
     borderRadius: 'md',
     borderColor: 'border-zinc-100',
     borderWidth: 'thin',
-    catalogItemContent: {
-      id: 'cat-2',
-      image: PLACEHOLDERS.watch,
-      title: 'The Steel Chronograph v4',
-      description: 'Brushed solid 316L medical stainless steel dial, manual mechanical movements, forest-green premium leather wrist strap.',
-      price: 320.0
-    }
-  },
-  {
-    id: 'c5',
-    type: 'catalog-item',
-    padding: 'medium',
-    bgColor: 'bg-zinc-50 border border-zinc-100',
-    textColor: 'text-zinc-900',
-    borderRadius: 'md',
-    borderColor: 'border-zinc-100',
-    borderWidth: 'thin',
-    catalogItemContent: {
-      id: 'cat-3',
-      image: PLACEHOLDERS.shoes,
-      title: 'Recycled Knit Runner',
-      description: 'Zero waste flyknit construct, ultra responsive bio-foam cushion, 100% natural vulcanized crepe rubber outer traction.',
-      price: 110.0
+    productContent: {
+      id: 'prod-2',
+      name: 'Рюкзак Explorer 25L',
+      description: 'Влагозащищенный городской рюкзак с отделением для ноутбука и дышащей спинкой.',
+      price: 85.0,
+      oldPrice: 120.0,
+      buttonText: 'Купить',
+      image: '/misty_rainy_forest_1781780284992.jpg',
+      images: ['/misty_rainy_forest_1781780284992.jpg']
     }
   }
 ];

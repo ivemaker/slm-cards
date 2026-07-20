@@ -794,7 +794,14 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
         <label className="block text-[9px] uppercase font-bold text-zinc-400 tracking-wider mb-1">{txtLayout}</label>
         <select
           value={profile.layout || 'stacked'}
-          onChange={(e) => updateProfileContent({ layout: e.target.value as any })}
+          onChange={(e) => {
+            const layout = e.target.value as any;
+            if (layout === 'row' && (profile.align === 'center' || !profile.align)) {
+              updateProfileContent({ layout, align: 'left' });
+            } else {
+              updateProfileContent({ layout });
+            }
+          }}
           className="w-full bg-zinc-900 border border-zinc-800 text-xs rounded-lg p-2 text-white cursor-pointer"
         >
           <option value="stacked">Stacked</option>
@@ -804,8 +811,8 @@ export const ProfileInspector: React.FC<ProfileInspectorProps> = ({
 
       <div>
         <label className="block text-[9px] uppercase font-bold text-zinc-400 tracking-wider mb-1.5">{txtAlign}</label>
-        <div className="grid grid-cols-3 gap-1.5">
-          {['left', 'center', 'right'].map((align) => (
+        <div className={`grid gap-1.5 ${profile.layout === 'row' ? 'grid-cols-2' : 'grid-cols-3'}`}>
+          {(profile.layout === 'row' ? ['left', 'right'] : ['left', 'center', 'right']).map((align) => (
             <button
               key={align}
               onClick={() => updateProfileContent({ align: align as any })}

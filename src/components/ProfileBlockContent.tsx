@@ -483,8 +483,13 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
     block.titleTextStyles?.textShadowEnabled || block.titleTextStyles?.textGlowEnabled || block.titleTextStyles?.textShimmerEnabled ||
     block.descTextStyles?.textShadowEnabled || block.descTextStyles?.textGlowEnabled || block.descTextStyles?.textShimmerEnabled;
 
+  const hasItalic = 
+    block.textItalic || 
+    block.titleTextStyles?.textItalic || 
+    block.descTextStyles?.textItalic;
+
   return (
-    <div className="w-full relative z-10">
+    <div className={`w-full relative z-10 flex flex-col space-y-3.5 ${isRow ? contentAlignClass : ''}`}>
       <div
         className={`w-full flex ${
           isRow
@@ -494,7 +499,7 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
       >
         {!isAvatarRight && avatarElement}
 
-        <div className={`space-y-1.5 flex-1 min-w-0 max-w-full ${hasTextEffects ? 'overflow-visible' : 'overflow-hidden'} ${isRow ? contentAlignClass : 'w-full ' + contentAlignClass}`}>
+        <div className={`flex-1 min-w-0 max-w-full ${(hasTextEffects || hasItalic) ? 'overflow-visible' : 'overflow-hidden'} ${isRow ? contentAlignClass : 'space-y-1.5 w-full ' + contentAlignClass}`}>
           <h2 
             className={`font-bold tracking-tight ${(block.titleTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''}`}
             style={{
@@ -506,21 +511,37 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
           >
             {profile.name}
           </h2>
-          <p 
-            className={`text-xs opacity-85 leading-relaxed font-light whitespace-pre-line break-words max-w-full ${(block.descTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''}`}
-            style={{
-              ...(block.customDescColor ? { color: block.customDescColor } : block.customTextColor ? { color: block.customTextColor } : {}),
-              ...(block.customDescFont ? { fontFamily: block.customDescFont } : {}),
-              fontSize: block.customDescFontSize !== undefined ? `${block.customDescFontSize}px` : undefined,
-              ...getTextStyles(block, true, isPremium)
-            }}
-          >
-            {profile.bio}
-          </p>
+          {!isRow && (
+            <p 
+              className={`text-xs opacity-85 leading-relaxed font-light whitespace-pre-line break-words max-w-full ${(block.descTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''}`}
+              style={{
+                ...(block.customDescColor ? { color: block.customDescColor } : block.customTextColor ? { color: block.customTextColor } : {}),
+                ...(block.customDescFont ? { fontFamily: block.customDescFont } : {}),
+                fontSize: block.customDescFontSize !== undefined ? `${block.customDescFontSize}px` : undefined,
+                ...getTextStyles(block, true, isPremium)
+              }}
+            >
+              {profile.bio}
+            </p>
+          )}
         </div>
 
         {isAvatarRight && avatarElement}
       </div>
+      
+      {isRow && profile.bio && (
+        <p 
+          className={`text-xs opacity-85 leading-relaxed font-light whitespace-pre-line break-words max-w-full ${(block.descTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''}`}
+          style={{
+            ...(block.customDescColor ? { color: block.customDescColor } : block.customTextColor ? { color: block.customTextColor } : {}),
+            ...(block.customDescFont ? { fontFamily: block.customDescFont } : {}),
+            fontSize: block.customDescFontSize !== undefined ? `${block.customDescFontSize}px` : undefined,
+            ...getTextStyles(block, true, isPremium)
+          }}
+        >
+          {profile.bio}
+        </p>
+      )}
     </div>
   );
 };

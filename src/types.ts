@@ -106,6 +106,42 @@ export interface CatalogItemContent {
   price: number;
 }
 
+export interface DishContent {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  weight: string;
+  buttonText?: string;
+  image?: string;
+  images: string[];
+  imageLayout?: 'left' | 'center' | 'right';
+  imageSize?: 'sm' | 'md' | 'lg';
+  priceColor?: string;
+  priceSize?: number;
+  weightColor?: string;
+  weightSize?: number;
+  buttonSize?: number;
+}
+
+export interface ProductContent {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  oldPrice?: number;
+  buttonText: string;
+  image?: string;
+  images: string[];
+  imageLayout?: 'left' | 'center' | 'right';
+  imageSize?: 'sm' | 'md' | 'lg';
+  priceColor?: string;
+  priceSize?: number;
+  oldPriceColor?: string;
+  oldPriceSize?: number;
+  buttonSize?: number;
+}
+
 export interface CategoryHeaderContent {
   title: string;
 }
@@ -124,7 +160,9 @@ export type BlockType =
   | 'spacer'
   | 'media'
   | 'group'
-  | 'row-group';
+  | 'row-group'
+  | 'dish'
+  | 'product';
 
 export interface MediaItem {
   id: string;
@@ -268,6 +306,8 @@ export interface Block {
   profileContent?: ProfileContent;
   socialsContent?: { 
     links: SocialLink[];
+    contactName?: string;
+    phones?: { number: string; isPrimary: boolean }[];
     iconSize?: number;
     maxPerRow?: number;
     iconSpacing?: 'small' | 'medium' | 'large';
@@ -277,6 +317,8 @@ export interface Block {
   textContent?: TextContent;
   buttonContent?: ButtonContent;
   catalogItemContent?: CatalogItemContent;
+  dishContent?: DishContent;
+  productContent?: ProductContent;
   categoryHeaderContent?: CategoryHeaderContent;
   spacerContent?: SpacerContent;
   groupContent?: GroupContent;
@@ -290,6 +332,12 @@ export interface Block {
   config?: {
     price?: number;
     isEcomEnabled?: boolean;
+  };
+  animation?: {
+    type: 'none' | 'fade' | 'slide';
+    direction?: 'left' | 'bottom' | 'right';
+    duration: number; // 200 - 1500ms
+    delay: number;    // 0 - 500ms
   };
 }
 
@@ -680,6 +728,7 @@ export interface ProjectConfig {
   conversions: number;
   mainBg?: MainBgConfig;
   designTemplate?: 'none' | 'chroma-lab';
+  appliedTemplateId?: string;
   blockDefaults?: Partial<Block>;
   blockTypeDefaults?: Record<string, Partial<Block>>;
 }

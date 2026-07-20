@@ -64,6 +64,7 @@ import {
   Moon,
   ShoppingCart,
   Coffee,
+  Utensils,
   Scissors,
   X,
   Upload,
@@ -97,6 +98,7 @@ import { BackgroundEffects } from './components/BackgroundEffects';
 import { GlassRefractorWrapper, GlobalGlassFilters } from './components/GlassEffectLayer';
 import { MediaBlockContent } from './components/MediaBlockContent';
 import { ProfileBlockContent } from './components/ProfileBlockContent';
+import { ScrollAnimate } from './components/effects/ScrollAnimate';
 import { CornerGlowOverlay } from './components/CornerGlowOverlay';
 import { ProjectsTab } from './components/ProjectsTab';
 import { DashboardTab } from './components/DashboardTab';
@@ -674,6 +676,20 @@ const DESIGN_PRESETS = [
   }
 ];
 
+const getPriceColor = (color: string | undefined, hasDarkFill: boolean) => {
+  if (!color || color === 'white' || color === '#ffffff') {
+    return hasDarkFill ? '#ffffff' : '#18181b';
+  }
+  return color;
+};
+
+const getSecondaryColor = (color: string | undefined, hasDarkFill: boolean) => {
+  if (!color || color === 'rgba(255,255,255,0.4)' || color === 'rgba(255, 255, 255, 0.4)') {
+    return hasDarkFill ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
+  }
+  return color;
+};
+
 export default function App() {
   // Synchronous top-level migration to permanently move existing user templates to ready-made templates list (v6)
   // This runs immediately upon initialization, before any useState initializers execute.
@@ -724,7 +740,7 @@ export default function App() {
   }
 
   // Navigation tabs: 'landing' | 'projects' | 'editor' | 'dashboard' | 'preview'
-  const { isAuthenticated, login, logout, planType, activeTab, setActiveTab, activeProjectId, projects, developerMode, updateProject } = useDev();
+  const { isAuthenticated, login, logout, planType, activeTab, setActiveTab, activeProjectId, projects, developerMode, updateProject, getProjectUrl } = useDev();
   const activeProjectForPremiumCheck = projects.find(p => p.id === activeProjectId);
   const isPremium = activeProjectForPremiumCheck ? (activeProjectForPremiumCheck.tariff === 'Premium') : (planType === 'premium');
   const toast = useToast();
@@ -878,6 +894,13 @@ export default function App() {
                 }
               }
 
+              if (loadedConfig) {
+                loadedConfig.blocks = loadedConfig.blocks.map(block => ({
+                  ...block,
+                  animation: block.animation || { type: 'none', duration: 500, delay: 0 }
+                }));
+              }
+
               setConfigs(prev => ({
                 ...prev,
                 [targetType]: loadedConfig
@@ -975,14 +998,10 @@ export default function App() {
 
         const templateMap = new Map<string, any>();
         systemTemplates.forEach(t => {
-          if (t && t.id && t.id !== 'tpl-anakonda' && t.id !== 'anakonda' && t.nameEn?.toLowerCase() !== 'anakonda' && t.nameRu?.toLowerCase() !== 'anakonda') {
+          if (t && t.id) {
             templateMap.set(t.id, t);
           }
         });
-
-        // Ensure any anakonda instances are deleted from the map
-        templateMap.delete('tpl-anakonda');
-        templateMap.delete('anakonda');
 
         const mergedTemplates = Array.from(templateMap.values()).map(cleanTemplateConfig);
         setCustomReadyTemplates(mergedTemplates);
@@ -1109,6 +1128,7 @@ export default function App() {
   // Controls visibility of sliding layers list, settings popup, and nested inserter
   const [showLayersPanel, setShowLayersPanel] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
+  const [activePhoneModal, setActivePhoneModal] = useState<{ contactName?: string; phones: { number: string; isPrimary: boolean }[] } | null>(null);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
 
   // DESIGN_PRESETS relocated to top-level module scope to avoid Temporal Dead Zone (TDZ)
@@ -1528,8 +1548,15 @@ export default function App() {
   // UI helper alerts
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   
-  // Public visitor cart state
-  const [cart, setCart] = useState<CartItem[]>([]);
+  // Public visitor cart state derived from active project to guarantee absolute isolation
+  const activeProject = activeProjectId ? projects.find(p => p.id === activeProjectId) : null;
+  const cart: CartItem[] = (activeProject?.cart || []).map((item: any) => ({
+    id: item.blockId || item.id || '',
+    title: item.name || item.title || '',
+    price: item.price || 0,
+    quantity: item.quantity || 1,
+    image: item.image || ''
+  }));
   const [isCartOpen, setIsCartOpen] = useState(false);
   
   // State for image uploads in progress
@@ -2204,6 +2231,7 @@ export default function App() {
       hasBorder: true,
       borderColor: isDarkTheme ? 'border-zinc-850' : 'border-zinc-100',
       borderWidth: 'thin',
+      animation: { type: 'none', duration: 500, delay: 0 }
     };
 
     // Populate initial logical default structures
@@ -2216,12 +2244,16 @@ export default function App() {
       // High contrast default background for profile
       newBlock.bgColor = isDarkTheme ? 'bg-zinc-900 border border-zinc-800/80' : 'bg-stone-50 border border-stone-200/50';
     } else if (type === 'socials') {
+      const activeProject = projects.find(p => p.id === activeProjectId);
       newBlock.socialsContent = {
         links: [
           { platform: 'instagram', url: 'https://instagram.com' },
           { platform: 'telegram', url: 'https://t.me' },
-          { platform: 'email', url: 'mailto:info@brand.com' }
-        ]
+          { platform: 'email', url: 'mailto:info@brand.com' },
+          { platform: 'phone', url: 'tel:+123456789' }
+        ],
+        contactName: activeProject?.name || 'Contact',
+        phones: [{ number: '', isPrimary: true }]
       };
       newBlock.bgColor = 'bg-transparent border-transparent';
       newBlock.borderWidth = 'none';
@@ -2246,6 +2278,41 @@ export default function App() {
         title: lang === 'en' ? 'Specialist Craft Work' : 'Авторское блюдо / Товар',
         description: lang === 'en' ? 'Fine custom detailing using durable vegetable leather accents.' : 'Опишите преимущества, материалы, состав или порцию этого товара.',
         price: 45.0
+      };
+      newBlock.bgColor = isDarkTheme ? 'bg-zinc-900' : 'bg-white';
+    } else if (type === 'dish') {
+      newBlock.dishContent = {
+        id: `dish_${Date.now()}`,
+        name: lang === 'en' ? 'Fresh Garden Salad' : 'Свежий салат',
+        description: lang === 'en' ? 'Organic greens, cherry tomatoes, cucumbers with olive oil dressing.' : 'Свежие органические листья, томаты черри, огурцы и заправка из оливкового масла.',
+        price: 12.50,
+        weight: lang === 'en' ? '250g' : '250 г',
+        images: ['/misty_rainy_forest_1781780284992.jpg'],
+        imageLayout: 'left',
+        imageSize: 'md',
+        priceColor: '#ffffff',
+        priceSize: 16,
+        weightColor: 'rgba(255,255,255,0.4)',
+        weightSize: 12,
+        buttonSize: 13
+      };
+      newBlock.bgColor = isDarkTheme ? 'bg-zinc-900' : 'bg-white';
+    } else if (type === 'product') {
+      newBlock.productContent = {
+        id: `prod_${Date.now()}`,
+        name: lang === 'en' ? 'Premium Leather Wallet' : 'Кожаное портмоне',
+        description: lang === 'en' ? 'Handcrafted full-grain leather wallet with multiple card slots.' : 'Ручная работа из натуральной кожи, несколько отделений для карт.',
+        price: 49.99,
+        oldPrice: 69.99,
+        buttonText: lang === 'en' ? 'Buy' : 'Купить',
+        images: ['/misty_rainy_forest_1781780284992.jpg'],
+        imageLayout: 'left',
+        imageSize: 'md',
+        priceColor: '#ffffff',
+        priceSize: 16,
+        oldPriceColor: 'rgba(255,255,255,0.4)',
+        oldPriceSize: 12,
+        buttonSize: 13
       };
       newBlock.bgColor = isDarkTheme ? 'bg-zinc-900' : 'bg-white';
     } else if (type === 'category-header') {
@@ -2533,10 +2600,12 @@ export default function App() {
                 avatarSvgRaw: rawSvgText || undefined
               }
             };
-          } else if (itemType === 'catalog' && b.catalogItemContent) {
+          } else if (itemType === 'catalog') {
             return {
               ...b,
-              catalogItemContent: { ...b.catalogItemContent, image: finalAvatarUrl }
+              catalogItemContent: b.catalogItemContent ? { ...b.catalogItemContent, image: finalAvatarUrl } : undefined,
+              dishContent: b.dishContent ? { ...b.dishContent, image: finalAvatarUrl } : undefined,
+              productContent: b.productContent ? { ...b.productContent, image: finalAvatarUrl } : undefined
             };
           }
         }
@@ -2565,7 +2634,9 @@ export default function App() {
       };
       saveToLocalStorage(updated);
       setSelectedBlockId(null);
-      setCart([]);
+      if (activeProjectId) {
+        updateProject(activeProjectId, { cart: [] });
+      }
       showToast(TRANSLATIONS[lang].originalTemplate);
     }
   };
@@ -3038,7 +3109,10 @@ export default function App() {
     if (!templateToApply) return;
 
     const currentConfig = configs[templateType];
-    const updatedConfig = { ...currentConfig };
+    const updatedConfig = { 
+      ...currentConfig,
+      appliedTemplateId: templateToApply.id
+    };
 
     // Record history state for Undo action
     setUndoStack(prev => ({
@@ -3339,18 +3413,122 @@ export default function App() {
 
   // Visitor shopping cart handlers
   const handleAddToCart = (item: { id: string; title: string; price: number; image?: string }) => {
+    if (!activeProjectId) return;
     const existing = cart.find(i => i.id === item.id);
+    let updatedCart;
     if (existing) {
-      setCart(cart.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i));
+      updatedCart = cart.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
     } else {
-      setCart([...cart, { ...item, quantity: 1 }]);
+      updatedCart = [...cart, { ...item, quantity: 1 }];
     }
+    const dbCart = updatedCart.map(i => ({
+      blockId: i.id,
+      name: i.title,
+      price: i.price,
+      quantity: i.quantity,
+      image: i.image
+    }));
+    updateProject(activeProjectId, { cart: dbCart });
+    
+    // Ensure the cart drawer DOES NOT open automatically when adding an item
+    setIsCartOpen(false);
+    
     // Simulate interactive clicks increasing for live feedback!
     updateConfigField('clicks', config.clicks + 1);
     showToast(lang === 'en' ? `Added ${item.title} to Cart` : `${item.title} добавлен в корзину`);
   };
 
+  const downloadVCard = () => {
+    if (!activePhoneModal) return;
+    const { contactName, phones } = activePhoneModal;
+    
+    // Find primary or use the first one
+    const primaryPhone = phones.find(p => p.isPrimary) || phones[0];
+    const otherPhones = phones.filter(p => p !== primaryPhone);
+
+    let vcard = `BEGIN:VCARD\r\nVERSION:3.0\r\nFN;CHARSET=UTF-8:${contactName || 'Contact'}\r\n`;
+    if (primaryPhone && primaryPhone.number) {
+      vcard += `TEL;TYPE=CELL,PREF:${primaryPhone.number}\r\n`;
+    }
+    otherPhones.forEach((p, idx) => {
+      if (p.number) {
+        vcard += `TEL;TYPE=CELL:${p.number}\r\n`;
+      }
+    });
+    vcard += 'END:VCARD\r\n';
+
+    const blob = new Blob([vcard], { type: 'text/vcard;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    // By omitting the 'download' attribute, iOS Safari opens the contact card natively
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 500);
+    setActivePhoneModal(null);
+  };
+
+  const renderPhoneModalUI = (isMockup = false) => {
+    if (!activePhoneModal) return null;
+    const { contactName, phones } = activePhoneModal;
+    const primaryPhone = phones.find(p => p.isPrimary) || phones[0];
+
+    // Clear primary number to call
+    const callNumber = primaryPhone ? primaryPhone.number.replace(/[^\d+]/g, '') : '';
+
+    return (
+      <>
+        <div 
+          className={`${isMockup ? 'absolute' : 'fixed'} inset-0 bg-black/40 backdrop-blur-sm z-[50]`} 
+          onClick={() => setActivePhoneModal(null)} 
+        />
+        <div className={`${isMockup ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 bg-neutral-900 rounded-t-2xl p-6 shadow-2xl z-[51] transform transition-transform text-white border-t border-neutral-800`}>
+          <div className="w-12 h-1.5 bg-neutral-700 rounded-full mx-auto mb-5" />
+          
+          <h3 className="text-lg font-bold mb-1 text-center font-sans tracking-tight">
+            {contactName || 'Contact'}
+          </h3>
+          <p className="text-xs text-neutral-400 text-center mb-6 font-mono">
+            {primaryPhone?.number || ''} {phones.length > 1 ? `(+${phones.length - 1} ${lang === 'en' ? 'more' : 'еще'})` : ''}
+          </p>
+
+          <div className="space-y-3">
+            {primaryPhone && primaryPhone.number && (
+              <a 
+                href={`tel:${callNumber}`}
+                className="w-full py-3.5 bg-blue-500 hover:bg-blue-600 rounded-xl text-sm font-bold text-white flex justify-center items-center gap-2 transition-colors active:scale-[0.98]"
+              >
+                <Phone className="w-4 h-4" />
+                {lang === 'en' ? 'Call' : 'Позвонить'}
+              </a>
+            )}
+            
+            <button 
+              onClick={downloadVCard}
+              className="w-full py-3.5 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-sm font-bold text-white flex justify-center items-center gap-2 transition-colors active:scale-[0.98] border border-neutral-700"
+            >
+              <UserPlus className="w-4 h-4" />
+              {lang === 'en' ? 'Save to Contacts' : 'Добавить в контакты'}
+            </button>
+            
+            <button 
+              onClick={() => setActivePhoneModal(null)}
+              className="w-full py-3 bg-transparent text-neutral-400 hover:text-white rounded-xl text-sm font-medium transition-colors"
+            >
+              {lang === 'en' ? 'Cancel' : 'Отмена'}
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  };
+
   const renderCartUI = (isMockup = false) => {
+    if (activeProject?.type === 'personal_card') return null;
     if (cart.length === 0) return null;
     const isDarkAppTheme = config.mainBg?.theme === 'dark';
 
@@ -3361,11 +3539,11 @@ export default function App() {
           <button
             id="floating_cart_badge"
             onClick={() => setIsCartOpen(true)}
-            className={`${isMockup ? 'absolute' : 'fixed'} top-4 right-4 z-[100] p-2 drop-shadow-md hover:scale-110 transition-transform active:scale-95 duration-200 animate-fade-in`}
+            className={`${isMockup ? 'absolute' : 'fixed'} top-4 right-4 z-[100] drop-shadow-md hover:scale-110 transition-transform active:scale-95 duration-200 animate-fade-in`}
           >
-            <div className={`relative flex items-center justify-center ${isDarkAppTheme ? 'text-white' : 'text-zinc-900'}`}>
-              <ShoppingBag size={26} strokeWidth={1.5} />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center shadow-sm">
+            <div className="relative flex items-center justify-center text-zinc-400">
+              <ShoppingCart size={28} strokeWidth={2} />
+              <span className="absolute -top-1 -right-2 w-5 h-5 bg-emerald-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow-sm">
                 {cart.reduce((s, c) => s + c.quantity, 0)}
               </span>
             </div>
@@ -3381,7 +3559,7 @@ export default function App() {
             >
               <div className="flex items-center justify-between border-b border-zinc-100 pb-3 shrink-0">
                 <h3 className="font-bold text-sm tracking-tight text-zinc-900 flex items-center gap-1.5">
-                  <ShoppingBag size={15} className="text-zinc-500" />
+                  <ShoppingCart size={15} className="text-zinc-500" />
                   <span>{TRANSLATIONS[lang].cartTitle}</span>
                 </h3>
                 <button onClick={() => setIsCartOpen(false)} className="text-[10px] text-zinc-400 hover:text-zinc-900 transition-colors uppercase font-mono font-bold tracking-widest px-1.5">Close ✕</button>
@@ -3426,14 +3604,32 @@ export default function App() {
   };
 
   const handleRemoveFromCart = (id: string) => {
-    setCart(cart.filter(i => i.id !== id));
+    if (!activeProjectId) return;
+    const updatedCart = cart.filter(i => i.id !== id);
+    const dbCart = updatedCart.map(i => ({
+      blockId: i.id,
+      name: i.title,
+      price: i.price,
+      quantity: i.quantity,
+      image: i.image
+    }));
+    updateProject(activeProjectId, { cart: dbCart });
   };
 
   const handleUpdateCartQty = (id: string, qty: number) => {
+    if (!activeProjectId) return;
     if (qty <= 0) {
       handleRemoveFromCart(id);
     } else {
-      setCart(cart.map(i => i.id === id ? { ...i, quantity: qty } : i));
+      const updatedCart = cart.map(i => i.id === id ? { ...i, quantity: qty } : i);
+      const dbCart = updatedCart.map(i => ({
+        blockId: i.id,
+        name: i.title,
+        price: i.price,
+        quantity: i.quantity,
+        image: i.image
+      }));
+      updateProject(activeProjectId, { cart: dbCart });
     }
   };
 
@@ -3482,7 +3678,9 @@ export default function App() {
     checkoutLink.click();
     
     // Reset cart
-    setCart([]);
+    if (activeProjectId) {
+      updateProject(activeProjectId, { cart: [] });
+    }
     setIsCartOpen(false);
     showToast(lang === 'en' ? "Redirecting to messaging app..." : "Переход к подтверждению заказа...");
   };
@@ -3493,9 +3691,9 @@ export default function App() {
     : '5.2';
 
   // Computed public site simulation address based on settings
-  const publicSimulatedUrl = config.isCustomDomainActive && config.customDomain
+  const publicSimulatedUrl = activeProjectForPremiumCheck ? getProjectUrl(activeProjectForPremiumCheck) : (config.isCustomDomainActive && config.customDomain
     ? `https://${config.customDomain}`
-    : `https://brand.co/${config.username}`;
+    : `https://slmcards.io/${activeProjectId || config.username}`);
 
   // Custom QR Code Generator SVG
   const qrSvgMarkup = generateSimpleQRCodeSVG(publicSimulatedUrl, 260);
@@ -3558,6 +3756,11 @@ export default function App() {
         block.textShadowEnabled || block.textGlowEnabled || block.textShimmerEnabled ||
         block.titleTextStyles?.textShadowEnabled || block.titleTextStyles?.textGlowEnabled || block.titleTextStyles?.textShimmerEnabled ||
         block.descTextStyles?.textShadowEnabled || block.descTextStyles?.textGlowEnabled || block.descTextStyles?.textShimmerEnabled;
+
+      const hasItalic = 
+        block.textItalic || 
+        block.titleTextStyles?.textItalic || 
+        block.descTextStyles?.textItalic;
 
       const fullWidthBleedClass = isFullWidthMedia
         ? '-mx-4 w-[calc(100%+32px)] max-w-none'
@@ -3875,7 +4078,7 @@ export default function App() {
           {/* CLIPPER CONTAINER: Handles border, background, and isolation */}
           <div 
             className={`
-              relative w-full ${(block.type === 'socials' || block.type === 'profile' || hasTextEffects) ? 'overflow-visible' : 'overflow-hidden'} z-[10]
+              relative w-full ${(block.type === 'socials' || block.type === 'profile' || hasTextEffects || hasItalic) ? 'overflow-visible' : 'overflow-hidden'} z-[10]
               ${paddingClass} ${resolvedTextColor}
               flex flex-col
             `}
@@ -3954,7 +4157,7 @@ export default function App() {
             )}
 
             {/* BLOCK CONTENT: Elevated above backgrounds */}
-            <div className={`relative z-40 w-full max-w-full break-words ${(block.type === 'socials' || block.type === 'profile' || hasTextEffects) ? 'overflow-visible' : 'overflow-hidden'} box-border font-sans`}>
+            <div className={`relative z-40 w-full max-w-full break-words ${(block.type === 'socials' || block.type === 'profile' || hasTextEffects || hasItalic) ? 'overflow-visible' : 'overflow-hidden'} box-border font-sans`}>
               {/* RENDER BY BLOCK TYPE */}
               {block.type === 'profile' && block.profileContent && (
                 <>
@@ -4236,6 +4439,35 @@ export default function App() {
                 </>
               );
 
+              if (link.platform === 'phone') {
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (block.socialsContent && block.socialsContent.phones && block.socialsContent.phones.length > 0) {
+                        setActivePhoneModal({
+                          contactName: block.socialsContent.contactName || activeProject?.name || 'Contact',
+                          phones: block.socialsContent.phones
+                        });
+                      } else {
+                        // Fallback if no phones defined
+                        if (!isPreviewMockupMode && link.url) {
+                          window.location.href = link.url;
+                        }
+                      }
+                    }}
+                    className={outerClassName}
+                    style={outerStyle}
+                    title={link.platform}
+                  >
+                    {innerContent}
+                  </button>
+                );
+              }
+
               if (isLink) {
                 return (
                   <a
@@ -4296,26 +4528,25 @@ export default function App() {
                       }
                     }
 
-                    return (
-                      <a
-                        key={idx}
-                        href={isPreviewMockupMode ? undefined : link.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`flex items-center justify-between w-full p-2.5 transition-all duration-150 active:scale-[0.99] border hover:shadow-xs ${radiusClass} ${
-                          block.customTextColor
-                            ? ''
-                            : hasDarkFill 
-                              ? 'bg-white/10 text-white hover:bg-white/15 border-white/5' 
-                              : 'bg-zinc-50 border-zinc-200/60 text-zinc-850 hover:bg-zinc-100/90 hover:border-zinc-350'
-                        }`}
-                        style={{
-                          color: block.customTextColor ? block.customTextColor : undefined,
-                          borderColor: block.customTextColor ? `${block.customTextColor}25` : undefined,
-                          backgroundColor: block.customTextColor ? `${block.customTextColor}10` : undefined,
-                        }}
-                        title={link.platform}
-                      >
+                    const sharedProps = {
+                      key: idx,
+                      className: `flex items-center justify-between w-full p-2.5 transition-all duration-150 active:scale-[0.99] border hover:shadow-xs ${radiusClass} ${
+                        block.customTextColor
+                          ? ''
+                          : hasDarkFill 
+                            ? 'bg-white/10 text-white hover:bg-white/15 border-white/5' 
+                            : 'bg-zinc-50 border-zinc-200/60 text-zinc-850 hover:bg-zinc-100/90 hover:border-zinc-350'
+                      }`,
+                      style: {
+                        color: block.customTextColor ? block.customTextColor : undefined,
+                        borderColor: block.customTextColor ? `${block.customTextColor}25` : undefined,
+                        backgroundColor: block.customTextColor ? `${block.customTextColor}10` : undefined,
+                      },
+                      title: link.platform
+                    };
+
+                    const inner = (
+                      <>
                         <div className="flex items-center gap-3">
                           {renderIconInnerAndWrapper(link, idx, false)}
                           <div className="flex flex-col text-left">
@@ -4324,6 +4555,41 @@ export default function App() {
                           </div>
                         </div>
                         <ChevronRight size={14} className="opacity-40 flex-shrink-0 mr-1" style={{ color: block.customTextColor || undefined }} />
+                      </>
+                    );
+
+                    if (link.platform === 'phone') {
+                      return (
+                        <button
+                          {...sharedProps}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (block.socialsContent && block.socialsContent.phones && block.socialsContent.phones.length > 0) {
+                              setActivePhoneModal({
+                                contactName: block.socialsContent.contactName || activeProject?.name || 'Contact',
+                                phones: block.socialsContent.phones
+                              });
+                            } else {
+                              if (!isPreviewMockupMode && link.url) {
+                                window.location.href = link.url;
+                              }
+                            }
+                          }}
+                        >
+                          {inner}
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <a
+                        {...sharedProps}
+                        href={isPreviewMockupMode ? undefined : link.url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {inner}
                       </a>
                     );
                   })}
@@ -4481,11 +4747,10 @@ export default function App() {
                   {block.catalogItemContent.description}
                 </p>
                 
-                {/* Add to Cart button option in Menu / Catalog modes */}
                 <div className="pt-2" style={{ textAlign: block.textAlign || 'right' }}>
                   <button
                     onClick={(e) => {
-                      if (isPreviewMockupMode) return; // ignore in active editor mockup clicks
+                      if (isPreviewMockupMode) return;
                       e.stopPropagation();
                       handleAddToCart({
                         id: block.id,
@@ -4508,6 +4773,340 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {block.type === 'dish' && block.dishContent && (() => {
+            const content = block.dishContent;
+            const imageLayout = content.imageLayout || 'left';
+            const imageSize = content.imageSize || 'md';
+            
+            const sizeClasses = {
+              sm: 'w-12 h-12',
+              md: 'w-16 h-16',
+              lg: 'w-24 h-24',
+            };
+            const imgSizeClass = sizeClasses[imageSize as 'sm' | 'md' | 'lg'] || 'w-16 h-16';
+            
+            const blockImages = content.images && content.images.length > 0
+              ? content.images
+              : [content.image || '/misty_rainy_forest_1781780284992.jpg'];
+            const firstImgSrc = blockImages[0] || '/misty_rainy_forest_1781780284992.jpg';
+
+            const finalWeightColor = content.weightColor || (hasDarkFill ? '#a1a1aa' : '#71717a');
+            const finalPriceColor = content.priceColor || (hasDarkFill ? '#ffffff' : '#18181b');
+
+            const weightFontSize = content.weightSize !== undefined ? `${content.weightSize}px` : '12px';
+            const priceFontSize = content.priceSize !== undefined ? `${content.priceSize}px` : '16px';
+            const buttonFontSize = content.buttonSize !== undefined ? `${content.buttonSize}px` : '13px';
+
+            const isCenterLayout = imageLayout === 'center';
+
+            return (
+              <div className="flex flex-col w-full gap-3">
+                {/* FIRST FLOOR (TOP FLOOR): Image/Carousel & Text */}
+                {isCenterLayout ? (
+                  <div className="flex flex-col w-full gap-3 text-center">
+                    <div className="w-full h-48 rounded-xl overflow-hidden relative border border-white/5 bg-zinc-950/40">
+                      <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-none">
+                        {blockImages.map((img, idx) => (
+                          <img
+                            key={idx}
+                            src={img}
+                            alt={`${content.name} ${idx + 1}`}
+                            className="w-full h-full flex-shrink-0 snap-center object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        ))}
+                      </div>
+                      {blockImages.length > 1 && (
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 bg-black/40 px-2 py-0.5 rounded-full z-10">
+                          {blockImages.map((_, idx) => (
+                            <div key={idx} className="w-1.5 h-1.5 rounded-full bg-white/60" />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 w-full">
+                      <h4 
+                        className={`font-semibold break-words whitespace-normal ${(block.titleTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''} ${block.customTitleColor || block.customTextColor ? '' : hasDarkFill ? 'text-white' : 'text-zinc-900'}`}
+                        style={{
+                          ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
+                          ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
+                          fontSize: block.customTitleFontSize !== undefined ? `${block.customTitleFontSize}px` : '13px',
+                          ...getTextStyles(block, false, isPremium),
+                          textAlign: 'center'
+                        }}
+                      >
+                        {content.name}
+                      </h4>
+
+                      <p 
+                        className={`text-[11px] font-light leading-relaxed break-words whitespace-normal mt-1 ${(block.descTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''} ${block.customDescColor || block.customTextColor ? '' : hasDarkFill ? 'text-zinc-300' : 'text-zinc-500'}`}
+                        style={{
+                          ...(block.customDescColor ? { color: block.customDescColor } : block.customTextColor ? { color: block.customTextColor } : {}),
+                          ...(block.customDescFont ? { fontFamily: block.customDescFont } : {}),
+                          fontSize: block.customDescFontSize !== undefined ? `${block.customDescFontSize}px` : undefined,
+                          opacity: 0.85,
+                          ...getTextStyles(block, true, isPremium),
+                          textAlign: 'center'
+                        }}
+                      >
+                        {content.description}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`flex gap-4 w-full ${imageLayout === 'right' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <img 
+                      src={firstImgSrc} 
+                      alt={content.name} 
+                      className={`${imgSizeClass} rounded-lg object-cover flex-shrink-0`}
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="flex-1 flex flex-col min-w-0">
+                      <h4 
+                        className={`font-semibold break-words whitespace-normal ${(block.titleTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''} ${block.customTitleColor || block.customTextColor ? '' : hasDarkFill ? 'text-white' : 'text-zinc-900'}`}
+                        style={{
+                          ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
+                          ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
+                          fontSize: block.customTitleFontSize !== undefined ? `${block.customTitleFontSize}px` : '13px',
+                          ...getTextStyles(block, false, isPremium),
+                          textAlign: block.textAlign || 'left'
+                        }}
+                      >
+                        {content.name}
+                      </h4>
+
+                      <p 
+                        className={`text-[11px] font-light leading-relaxed break-words whitespace-normal mt-1 ${(block.descTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''} ${block.customDescColor || block.customTextColor ? '' : hasDarkFill ? 'text-zinc-300' : 'text-zinc-500'}`}
+                        style={{
+                          ...(block.customDescColor ? { color: block.customDescColor } : block.customTextColor ? { color: block.customTextColor } : {}),
+                          ...(block.customDescFont ? { fontFamily: block.customDescFont } : {}),
+                          fontSize: block.customDescFontSize !== undefined ? `${block.customDescFontSize}px` : undefined,
+                          opacity: 0.85,
+                          ...getTextStyles(block, true, isPremium),
+                          textAlign: block.textAlign || 'left'
+                        }}
+                      >
+                        {content.description}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* SECOND FLOOR (BOTTOM FLOOR): Footer Price, Weight, Action Button */}
+                <div className="flex items-center justify-between w-full pt-3 border-t border-white/5 gap-2 mt-auto">
+                  <div className="flex items-center gap-2">
+                    {content.weight && (
+                      <span 
+                        style={{ color: finalWeightColor, fontSize: weightFontSize }} 
+                        className="font-mono"
+                      >
+                        ({content.weight})
+                      </span>
+                    )}
+                    <span 
+                      style={{ color: finalPriceColor, fontSize: priceFontSize }} 
+                      className="font-mono font-semibold"
+                    >
+                      {formatPrice(content.price, lang)}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      if (isPreviewMockupMode) return;
+                      e.stopPropagation();
+                      handleAddToCart({
+                        id: block.id,
+                        title: content.name,
+                        price: content.price,
+                        image: firstImgSrc,
+                      });
+                    }}
+                    style={{
+                      fontSize: buttonFontSize,
+                      ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {})
+                    }}
+                    className={`px-2.5 py-1 border border-transparent rounded font-medium transition shadow-sm active:scale-95 inline-flex items-center gap-1.5 ${
+                      hasDarkFill 
+                        ? 'bg-white text-zinc-950 hover:bg-zinc-100' 
+                        : 'bg-zinc-900 text-white hover:bg-zinc-800'
+                    }`}
+                  >
+                    <Plus size={10} />
+                    {lang === 'en' ? '+ Add to Cart' : '+ В корзину'}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
+          {block.type === 'product' && block.productContent && (() => {
+            const content = block.productContent;
+            const imageLayout = content.imageLayout || 'left';
+            const imageSize = content.imageSize || 'md';
+            
+            const sizeClasses = {
+              sm: 'w-12 h-12',
+              md: 'w-16 h-16',
+              lg: 'w-24 h-24',
+            };
+            const imgSizeClass = sizeClasses[imageSize as 'sm' | 'md' | 'lg'] || 'w-16 h-16';
+            
+            const blockImages = content.images && content.images.length > 0
+              ? content.images
+              : [content.image || '/misty_rainy_forest_1781780284992.jpg'];
+            const firstImgSrc = blockImages[0] || '/misty_rainy_forest_1781780284992.jpg';
+
+            const finalOldPriceColor = content.oldPriceColor || (hasDarkFill ? '#a1a1aa' : '#71717a');
+            const finalPriceColor = content.priceColor || (hasDarkFill ? '#ffffff' : '#18181b');
+
+            const oldPriceFontSize = content.oldPriceSize !== undefined ? `${content.oldPriceSize}px` : '12px';
+            const priceFontSize = content.priceSize !== undefined ? `${content.priceSize}px` : '16px';
+            const buttonFontSize = content.buttonSize !== undefined ? `${content.buttonSize}px` : '13px';
+
+            const isCenterLayout = imageLayout === 'center';
+
+            return (
+              <div className="flex flex-col w-full gap-3">
+                {/* FIRST FLOOR (TOP FLOOR): Image/Carousel & Text */}
+                {isCenterLayout ? (
+                  <div className="flex flex-col w-full gap-3 text-center">
+                    <div className="w-full h-48 rounded-xl overflow-hidden relative border border-white/5 bg-zinc-950/40">
+                      <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-none">
+                        {blockImages.map((img, idx) => (
+                          <img
+                            key={idx}
+                            src={img}
+                            alt={`${content.name} ${idx + 1}`}
+                            className="w-full h-full flex-shrink-0 snap-center object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        ))}
+                      </div>
+                      {blockImages.length > 1 && (
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 bg-black/40 px-2 py-0.5 rounded-full z-10">
+                          {blockImages.map((_, idx) => (
+                            <div key={idx} className="w-1.5 h-1.5 rounded-full bg-white/60" />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 w-full">
+                      <h4 
+                        className={`font-semibold break-words whitespace-normal ${(block.titleTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''} ${block.customTitleColor || block.customTextColor ? '' : hasDarkFill ? 'text-white' : 'text-zinc-900'}`}
+                        style={{
+                          ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
+                          ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
+                          fontSize: block.customTitleFontSize !== undefined ? `${block.customTitleFontSize}px` : '13px',
+                          ...getTextStyles(block, false, isPremium),
+                          textAlign: 'center'
+                        }}
+                      >
+                        {content.name}
+                      </h4>
+
+                      <p 
+                        className={`text-[11px] font-light leading-relaxed break-words whitespace-normal mt-1 ${(block.descTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''} ${block.customDescColor || block.customTextColor ? '' : hasDarkFill ? 'text-zinc-300' : 'text-zinc-500'}`}
+                        style={{
+                          ...(block.customDescColor ? { color: block.customDescColor } : block.customTextColor ? { color: block.customTextColor } : {}),
+                          ...(block.customDescFont ? { fontFamily: block.customDescFont } : {}),
+                          fontSize: block.customDescFontSize !== undefined ? `${block.customDescFontSize}px` : undefined,
+                          opacity: 0.85,
+                          ...getTextStyles(block, true, isPremium),
+                          textAlign: 'center'
+                        }}
+                      >
+                        {content.description}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`flex gap-4 w-full ${imageLayout === 'right' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <img 
+                      src={firstImgSrc} 
+                      alt={content.name} 
+                      className={`${imgSizeClass} rounded-lg object-cover flex-shrink-0`}
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="flex-1 flex flex-col min-w-0">
+                      <h4 
+                        className={`font-semibold break-words whitespace-normal ${(block.titleTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''} ${block.customTitleColor || block.customTextColor ? '' : hasDarkFill ? 'text-white' : 'text-zinc-900'}`}
+                        style={{
+                          ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
+                          ...(block.customTitleFont ? { fontFamily: block.customTitleFont } : {}),
+                          fontSize: block.customTitleFontSize !== undefined ? `${block.customTitleFontSize}px` : '13px',
+                          ...getTextStyles(block, false, isPremium),
+                          textAlign: block.textAlign || 'left'
+                        }}
+                      >
+                        {content.name}
+                      </h4>
+
+                      <p 
+                        className={`text-[11px] font-light leading-relaxed break-words whitespace-normal mt-1 ${(block.descTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''} ${block.customDescColor || block.customTextColor ? '' : hasDarkFill ? 'text-zinc-300' : 'text-zinc-500'}`}
+                        style={{
+                          ...(block.customDescColor ? { color: block.customDescColor } : block.customTextColor ? { color: block.customTextColor } : {}),
+                          ...(block.customDescFont ? { fontFamily: block.customDescFont } : {}),
+                          fontSize: block.customDescFontSize !== undefined ? `${block.customDescFontSize}px` : undefined,
+                          opacity: 0.85,
+                          ...getTextStyles(block, true, isPremium),
+                          textAlign: block.textAlign || 'left'
+                        }}
+                      >
+                        {content.description}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* SECOND FLOOR (BOTTOM FLOOR): Footer Price, Old Price, Action Button */}
+                <div className="flex items-center justify-between w-full pt-3 border-t border-white/5 gap-2 mt-auto">
+                  <div className="flex items-center gap-2">
+                    {content.oldPrice !== undefined && content.oldPrice > 0 && (
+                      <span 
+                        style={{ color: finalOldPriceColor, fontSize: oldPriceFontSize }} 
+                        className="line-through font-mono opacity-60"
+                      >
+                        {formatPrice(content.oldPrice, lang)}
+                      </span>
+                    )}
+                    <span 
+                      style={{ color: finalPriceColor, fontSize: priceFontSize }} 
+                      className="font-mono font-bold"
+                    >
+                      {formatPrice(content.price, lang)}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      if (isPreviewMockupMode) return;
+                      e.stopPropagation();
+                      handleAddToCart({
+                        id: block.id,
+                        title: content.name,
+                        price: content.price,
+                        image: firstImgSrc,
+                      });
+                    }}
+                    style={{
+                      fontSize: buttonFontSize,
+                      ...(block.customTitleColor ? { color: block.customTitleColor } : block.customTextColor ? { color: block.customTextColor } : {})
+                    }}
+                    className={`px-2.5 py-1 border border-transparent rounded font-medium transition shadow-sm active:scale-95 inline-flex items-center gap-1.5 ${
+                      hasDarkFill 
+                        ? 'bg-white text-zinc-950 hover:bg-zinc-100' 
+                        : 'bg-zinc-900 text-white hover:bg-zinc-800'
+                    }`}
+                  >
+                    <Plus size={10} />
+                    {content.buttonText || (lang === 'en' ? 'Buy' : 'Купить')}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
           {block.type === 'category-header' && block.categoryHeaderContent && (
             <div 
@@ -4565,7 +5164,11 @@ export default function App() {
                     {lang === 'en' ? '[ Empty Group Container ]' : '[ Пустая группа фреймов ]'}
                   </div>
                 ) : (
-                  block.groupContent.blocks.map(innerBlock => renderSingleBlock(innerBlock, block.groupContent?.layout === 'row'))
+                  block.groupContent.blocks.map(innerBlock => (
+                    <ScrollAnimate key={innerBlock.id} block={innerBlock} isEditor={isPreviewMockupMode} isPremium={isPremium}>
+                      {renderSingleBlock(innerBlock, block.groupContent?.layout === 'row')}
+                    </ScrollAnimate>
+                  ))
                 )}
               </div>
             </div>
@@ -4645,7 +5248,11 @@ export default function App() {
         className={`flex flex-col ${fontClass} text-zinc-900 transition-all duration-300 w-full ${containerWidthClass} mx-auto relative min-h-full flex-1`}
         style={{ gap: `${blockSpacingPx}px` }}
       >
-        {config.blocks.map((block) => renderSingleBlock(block))}
+        {config.blocks.map((block) => (
+          <ScrollAnimate key={block.id} block={block} isEditor={isPreviewMockupMode} isPremium={isPremium}>
+            {renderSingleBlock(block)}
+          </ScrollAnimate>
+        ))}
 
         {/* Dynamic "+" Inserter at the bottom of the blocks (Only in Editor Mode) */}
         {isPreviewMockupMode && (
@@ -4713,12 +5320,23 @@ export default function App() {
                       { type: 'socials', icon: Share2, label: lang === 'en' ? 'Socials' : 'Сети' },
                       { type: 'text', icon: Type, label: lang === 'en' ? 'Text' : 'Текст' },
                       { type: 'button', icon: MousePointerClick, label: lang === 'en' ? 'CTA' : 'Кнопка' },
-                      { type: 'catalog-item', icon: ShoppingBag, label: lang === 'en' ? 'Product' : 'Товар' },
+                      { type: 'dish', icon: Utensils, label: lang === 'en' ? 'Dish' : 'Блюдо' },
+                      { type: 'product', icon: ShoppingBag, label: lang === 'en' ? 'Product' : 'Товар' },
                       { type: 'category-header', icon: FolderHeart, label: lang === 'en' ? 'Header' : 'Раздел' },
                       { type: 'spacer', icon: ArrowUpDown, label: lang === 'en' ? 'Spacer' : 'Отступ' },
                       { type: 'media', icon: ImageIcon, label: lang === 'en' ? 'Media' : 'Медиа' },
                       { type: 'group', icon: FolderPlus, iconColor: 'text-amber-500', label: lang === 'en' ? 'Group' : 'Группа' },
-                    ].map((btn) => {
+                    ].filter((btn) => {
+                      const activeProj = projects.find(p => p.id === activeProjectId);
+                      const projectType = activeProj?.type;
+                      if (btn.type === 'dish') {
+                        return projectType === 'menu';
+                      }
+                      if (btn.type === 'product') {
+                        return projectType === 'catalog';
+                      }
+                      return true;
+                    }).map((btn) => {
                       const IconComp = btn.icon;
                       return (
                         <button
@@ -5034,7 +5652,7 @@ export default function App() {
                   <FolderOpen size={14} />
                   <span>
                     {lang === 'en' ? 'My Projects' : 'Мои проекты'}
-                    {activeTab === 'editor' && activeProjectId && (
+                    {((activeTab === 'editor' || activeTab === 'dashboard') && activeProjectId) && (
                       <>
                         <span className="mx-2 text-zinc-600 font-normal">/</span>
                         <span className="text-zinc-200" title={projects.find(p => p.id === activeProjectId)?.name || 'Project'}>
@@ -5042,6 +5660,14 @@ export default function App() {
                             const name = projects.find(p => p.id === activeProjectId)?.name || 'Project';
                             return name.length > 30 ? name.slice(0, 27) + '...' : name;
                           })()}
+                        </span>
+                      </>
+                    )}
+                    {activeTab === 'dashboard' && activeProjectId && (
+                      <>
+                        <span className="mx-2 text-zinc-600 font-normal">/</span>
+                        <span className="text-zinc-400 font-normal">
+                          {lang === 'en' ? 'Analytics' : 'Аналитика'}
                         </span>
                       </>
                     )}
@@ -5080,7 +5706,7 @@ export default function App() {
               )}
 
               {/* 👁️ PUBLIC PREVIEW BUTTON (Highly Prominent!) */}
-              {isAuthenticated && activeProjectId && activeTab !== 'editor' && activeTab !== 'projects' && activeTab !== 'landing' && (
+              {isAuthenticated && activeProjectId && activeTab !== 'projects' && activeTab !== 'landing' && (
                 <button
                   onClick={() => {
                     setActiveTab('preview');
@@ -5088,7 +5714,9 @@ export default function App() {
                     updateConfigField('views', config.views + 1);
                     setIsBurgerMenuOpen(false);
                   }}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                  className={`px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 text-white rounded-lg text-xs font-bold items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer ${
+                    activeTab === 'editor' ? 'flex md:hidden' : 'flex'
+                  }`}
                   title={lang === 'en' ? 'Open Public Preview' : 'Открыть публичный просмотр'}
                 >
                   <Eye size={14} />
@@ -5412,6 +6040,7 @@ export default function App() {
                 onDeleteReadyTemplate={handleDeleteReadyTemplate}
                 onUpdateReadyTemplates={handleUpdateReadyTemplates}
                 onAddReadyTemplate={handleSaveReadyTemplate}
+                updateBlocks={updateBlocks}
               />
             </div>
 
@@ -5690,7 +6319,7 @@ export default function App() {
                               const nextTheme = config.mainBg.theme === 'dark' ? 'light' : 'dark';
                               updateConfigField('mainBg', { ...config.mainBg, theme: nextTheme });
                             }}
-                            className="absolute top-3 right-6 z-30 p-1.5 bg-zinc-900/80 backdrop-blur-md rounded-full border border-zinc-800 text-zinc-400 hover:text-white transition-all cursor-pointer shadow-lg hover:scale-110 active:scale-95"
+                            className="absolute top-3 left-6 z-30 p-1.5 bg-zinc-900/80 backdrop-blur-md rounded-full border border-zinc-800 text-zinc-400 hover:text-white transition-all cursor-pointer shadow-lg hover:scale-110 active:scale-95"
                             title={lang === 'en' ? 'Toggle Light/Dark' : 'Переключить Светлая/Темная'}
                           >
                             {config.mainBg.theme === 'dark' ? <Sun size={12} className="text-amber-400" /> : <Moon size={12} className="text-blue-400" />}
@@ -5715,6 +6344,7 @@ export default function App() {
                               )}
                               <BackgroundEffects effects={editorBgInfo.effects} scrollOffset={phoneScrollY} />
                               <div 
+                                id="phone-scroll-container"
                                 className={innerClassName} 
                                 style={innerStyle} 
                                 onScroll={(e) => {
@@ -5726,6 +6356,7 @@ export default function App() {
                                 </div>
                               </div>
                               {renderCartUI(true)}
+                              {renderPhoneModalUI(true)}
                             </div>
                           );
                         })()}
@@ -5768,7 +6399,7 @@ export default function App() {
                                 const nextTheme = config.mainBg.theme === 'dark' ? 'light' : 'dark';
                                 updateConfigField('mainBg', { ...config.mainBg, theme: nextTheme });
                               }}
-                              className="absolute top-3 right-8 z-30 p-1.5 bg-zinc-900/80 backdrop-blur-md rounded-full border border-zinc-800 text-zinc-400 hover:text-white transition-all cursor-pointer shadow-lg hover:scale-110 active:scale-95"
+                              className="absolute top-3 left-8 z-30 p-1.5 bg-zinc-900/80 backdrop-blur-md rounded-full border border-zinc-800 text-zinc-400 hover:text-white transition-all cursor-pointer shadow-lg hover:scale-110 active:scale-95"
                               title={lang === 'en' ? 'Toggle Light/Dark' : 'Переключить Светлая/Темная'}
                             >
                               {config.mainBg.theme === 'dark' ? <Sun size={14} className="text-amber-400" /> : <Moon size={14} className="text-blue-400" />}
@@ -5793,6 +6424,7 @@ export default function App() {
                                 )}
                                 <BackgroundEffects effects={editorBgInfo.effects} scrollOffset={phoneScrollY} />
                                 <div 
+                                  id="phone-scroll-container"
                                   className={innerClassName} 
                                   style={innerStyle} 
                                   onScroll={(e) => {
@@ -5804,6 +6436,7 @@ export default function App() {
                                   </div>
                                 </div>
                                 {renderCartUI(true)}
+                                {renderPhoneModalUI(true)}
                               </div>
                             );
                           })()}
@@ -5958,6 +6591,7 @@ export default function App() {
                   {renderPublicBlocks(false)}
 
                   {renderCartUI()}
+                  {renderPhoneModalUI()}
 
                   {/* Static tiny trademark footer */}
                   <footer className={`mt-14 text-center border-t pt-6 text-[10px] font-mono tracking-wider w-full ${

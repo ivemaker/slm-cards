@@ -41,6 +41,8 @@ import { SpacerInspector } from './inspectors/SpacerInspector';
 import { GroupInspector } from './inspectors/GroupInspector';
 import { StyleAccordion } from './inspectors/StyleAccordion';
 import { MediaInspector } from './inspectors/MediaInspector';
+import { DishInspector } from './inspectors/DishInspector';
+import { ProductInspector } from './inspectors/ProductInspector';
 
 export const BlockInspector: React.FC<BlockInspectorProps> = ({
   focusedBlock,
@@ -167,6 +169,26 @@ export const BlockInspector: React.FC<BlockInspectorProps> = ({
       case 'catalog-item':
         return (
           <CatalogItemInspector
+            focusedBlock={focusedBlock}
+            lang={lang}
+            updateFocusedBlock={updateFocusedBlock}
+            handleImageUpload={handleImageUpload}
+            isCompressing={isCompressing}
+          />
+        );
+      case 'dish':
+        return (
+          <DishInspector
+            focusedBlock={focusedBlock}
+            lang={lang}
+            updateFocusedBlock={updateFocusedBlock}
+            handleImageUpload={handleImageUpload}
+            isCompressing={isCompressing}
+          />
+        );
+      case 'product':
+        return (
+          <ProductInspector
             focusedBlock={focusedBlock}
             lang={lang}
             updateFocusedBlock={updateFocusedBlock}

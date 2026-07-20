@@ -18,6 +18,10 @@ export interface MockProject {
   whatsappPhone?: string;
   telegramUsername?: string;
   hasUnpublishedChanges?: boolean;
+  cart?: { blockId: string; name: string; price: number; quantity: number }[];
+  customDomain?: string;
+  subdomain?: string;
+  premiumExpiredAt?: string;
 }
 
 export interface DevContextType {
@@ -45,6 +49,7 @@ export interface DevContextType {
   isSaving: boolean;
   developerMode: boolean;
   setDeveloperMode: (mode: boolean) => void;
+  getProjectUrl: (project: MockProject) => string;
 }
 
 const DevContext = createContext<DevContextType | undefined>(undefined);
@@ -124,6 +129,59 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [planType, activeTab, activeProjectId, projects, developerMode, isAuthenticated]);
 
+  // Grace Period Background Check
+  useEffect(() => {
+    const GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+    let hasChanges = false;
+    const now = Date.now();
+
+    const updatedProjects = projects.map(p => {
+      if ((p.tariff === 'Basic' || p.tariff === 'Unpaid') && p.premiumExpiredAt) {
+        const expiredDate = new Date(p.premiumExpiredAt).getTime();
+        if (now - expiredDate > GRACE_PERIOD_MS) {
+          hasChanges = true;
+          toast.error(`Домен проекта ${p.name} отключен (Grace Period истек)`);
+          return {
+            ...p,
+            customDomain: undefined,
+            subdomain: undefined,
+            premiumExpiredAt: undefined
+          };
+        }
+      }
+      return p;
+    });
+
+    if (hasChanges) {
+      setProjects(updatedProjects);
+    }
+  }, [projects, toast]);
+
+  const getProjectUrl = (project: MockProject): string => {
+    const isPremium = project.tariff === 'Premium';
+    let isGracePeriodActive = false;
+
+    if ((project.tariff === 'Basic' || project.tariff === 'Unpaid') && project.premiumExpiredAt) {
+      const expiredDate = new Date(project.premiumExpiredAt).getTime();
+      const GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+      if (Date.now() - expiredDate <= GRACE_PERIOD_MS) {
+        isGracePeriodActive = true;
+      }
+    }
+
+    const canUseCustomUrl = isPremium || isGracePeriodActive;
+
+    if (canUseCustomUrl) {
+      if (project.customDomain) {
+        return `https://${project.customDomain}`;
+      }
+      if (project.subdomain) {
+        return `https://${project.subdomain}.slmcards.io`;
+      }
+    }
+    return `https://slmcards.io/${project.id}`;
+  };
+
   const login = () => {
     setIsAuthenticated(true);
     localStorage.setItem('slm_auth_status', 'true');
@@ -182,7 +240,8 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       description,
       layout,
       themeStyle,
-      createdAt: new Date().toLocaleDateString('ru-RU')
+      createdAt: new Date().toLocaleDateString('ru-RU'),
+      cart: []
     };
     setProjects(prev => [...prev, newProject]);
     setActiveProjectId(newId);
@@ -229,7 +288,8 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setActiveTab,
         isSaving,
         developerMode,
-        setDeveloperMode
+        setDeveloperMode,
+        getProjectUrl
       }}
     >
       {children}

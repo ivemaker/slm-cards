@@ -3,13 +3,81 @@ import { useDev } from '../context/DevContext';
 import { useToast } from '../context/ToastContext';
 
 export const DevPanel: React.FC = () => {
-  const { isAuthenticated, login, logout, planType, setPlanType, developerMode, setDeveloperMode } = useDev();
-  const { success: toastSuccess, error: toastError } = useToast();
+  const { 
+    isAuthenticated, 
+    login, 
+    logout, 
+    planType, 
+    setPlanType, 
+    developerMode, 
+    setDeveloperMode,
+    projects,
+    activeProjectId,
+    updateProject
+  } = useDev();
+
+  const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [tempDomain, setTempDomain] = useState<string>('');
+  const [tempSubdomain, setTempSubdomain] = useState<string>('');
+  const [showConfirmReset, setShowConfirmReset] = useState<boolean>(false);
+
+  const activeProject = projects.find(p => p.id === activeProjectId);
+
+  React.useEffect(() => {
+    if (activeProject) {
+      setTempDomain(activeProject.customDomain || '');
+      setTempSubdomain(activeProject.subdomain || '');
+    }
+  }, [activeProject?.customDomain, activeProject?.subdomain, activeProjectId]);
 
   const handleResetLocalStorage = () => {
     localStorage.clear();
     window.location.reload();
+  };
+
+  const handleFinishPremium = () => {
+    if (activeProjectId) {
+      updateProject(activeProjectId, {
+        plan: 'basic',
+        tariff: 'Basic',
+        premiumExpiredAt: new Date().toISOString()
+      });
+      toastInfo?.('Начался 7-дневный льготный период (Grace Period)');
+    } else {
+      toastError('Нет активного проекта');
+    }
+  };
+
+  const handleFastForward8Days = () => {
+    if (activeProjectId) {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 8);
+      updateProject(activeProjectId, {
+        premiumExpiredAt: pastDate.toISOString()
+      });
+      toastSuccess('Перемотано на 8 дней вперед. Ожидайте отключения.');
+    } else {
+      toastError('Нет активного проекта');
+    }
+  };
+
+  const applyCustomDomain = () => {
+    if (activeProjectId) {
+      updateProject(activeProjectId, {
+        customDomain: tempDomain || undefined
+      });
+      toastSuccess('Custom Domain обновлен');
+    }
+  };
+
+  const applySubdomain = () => {
+    if (activeProjectId) {
+      updateProject(activeProjectId, {
+        subdomain: tempSubdomain || undefined
+      });
+      toastSuccess('Subdomain обновлен');
+    }
   };
 
   return (
@@ -26,7 +94,7 @@ export const DevPanel: React.FC = () => {
         </button>
       ) : (
         <div 
-          className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800 text-zinc-100 p-4 rounded-xl shadow-2xl w-80 animate-fade-in"
+          className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800 text-zinc-100 p-4 rounded-xl shadow-2xl w-80 animate-fade-in max-h-[85vh] overflow-y-auto"
           id="dev-panel-expanded"
         >
           {/* Header */}
@@ -181,6 +249,50 @@ export const DevPanel: React.FC = () => {
           {/* Actions & Tests Section */}
           <div className="border-t border-zinc-800 pt-3 mt-4 space-y-3" id="dev-section-tests">
             <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+              Симуляция доменов
+            </label>
+            <div className="space-y-2 mb-2">
+              <button
+                type="button"
+                onClick={handleFinishPremium}
+                className="w-full py-1.5 px-2 bg-amber-900/30 hover:bg-amber-800/40 text-amber-400 rounded-lg text-[11px] font-medium border border-amber-800/50 transition-all cursor-pointer text-left"
+              >
+                🔸 Завершить Premium (Basic + 7 days Grace)
+              </button>
+              <button
+                type="button"
+                onClick={handleFastForward8Days}
+                className="w-full py-1.5 px-2 bg-rose-900/30 hover:bg-rose-800/40 text-rose-400 rounded-lg text-[11px] font-medium border border-rose-800/50 transition-all cursor-pointer text-left"
+              >
+                ⏩ Перемотать на 8 дней вперед
+              </button>
+            </div>
+            <div className="space-y-2 mb-4">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Custom Domain (agency.com)"
+                  value={tempDomain}
+                  onChange={(e) => setTempDomain(e.target.value)}
+                  className="flex-1 bg-zinc-950 border border-zinc-800 text-[10px] rounded p-1.5 text-white focus:outline-none"
+                />
+                <button onClick={applyCustomDomain} className="bg-zinc-800 text-[10px] px-2 rounded hover:bg-zinc-700">Set</button>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Subdomain (mybrand)"
+                  value={tempSubdomain}
+                  onChange={(e) => setTempSubdomain(e.target.value)}
+                  className="flex-1 bg-zinc-950 border border-zinc-800 text-[10px] rounded p-1.5 text-white focus:outline-none"
+                />
+                <button onClick={applySubdomain} className="bg-zinc-800 text-[10px] px-2 rounded hover:bg-zinc-700">Set</button>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-zinc-800 pt-3 mt-4 space-y-3" id="dev-section-tests">
+            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
               Тесты и сброс
             </label>
             
@@ -203,14 +315,40 @@ export const DevPanel: React.FC = () => {
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={handleResetLocalStorage}
-              className="w-full py-2 px-3 bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 rounded-lg text-[11px] font-bold border border-rose-500/20 transition-all cursor-pointer text-center"
-              id="dev-btn-reset-storage"
-            >
-              🔄 Сбросить LocalStorage
-            </button>
+            {!showConfirmReset ? (
+              <button
+                type="button"
+                onClick={() => setShowConfirmReset(true)}
+                className="w-full py-2 px-3 bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 rounded-lg text-[11px] font-bold border border-rose-500/20 transition-all cursor-pointer text-center"
+                id="dev-btn-reset-storage"
+              >
+                🔄 Сбросить LocalStorage
+              </button>
+            ) : (
+              <div className="p-2.5 bg-rose-950/20 border border-rose-500/30 rounded-lg space-y-2 animate-fade-in" id="dev-confirm-reset-box">
+                <p className="text-[10px] text-rose-200 font-medium leading-normal text-center">
+                  Вы уверены? Это действие сотрет все локальные проекты, шаблоны и настройки!
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetLocalStorage}
+                    className="py-1 px-2 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-bold transition-all cursor-pointer text-center"
+                    id="dev-btn-confirm-reset"
+                  >
+                    Да, сбросить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmReset(false)}
+                    className="py-1 px-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-[10px] font-medium transition-all cursor-pointer text-center"
+                    id="dev-btn-cancel-reset"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

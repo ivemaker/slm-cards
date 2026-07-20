@@ -111,6 +111,9 @@ export default class Raindrops {
   public lastRender: number | null = null;
   private animId: number | null = null;
   private isDestroyed: boolean = false;
+  public isWiping: boolean = false;
+  public pointerPos: { x: number; y: number } = { x: 0, y: 0 };
+  public lastPointerPos: { x: number; y: number } | null = null;
 
   constructor(
     width: number,
@@ -242,7 +245,7 @@ export default class Raindrops {
       (x - r) * this.dropletsPixelDensity * this.scale,
       (y - r) * this.dropletsPixelDensity * this.scale,
       r * 2 * this.dropletsPixelDensity * this.scale,
-      r * 2 * this.dropletsPixelDensity * this.scale * 1.5
+      r * 2 * this.dropletsPixelDensity * this.scale
     );
   }
 
@@ -518,9 +521,59 @@ export default class Raindrops {
     this.drops = newDrops;
   }
 
-  public update(): void {
+  public update(dt?: any, isWiping?: boolean, pointerPos?: { x: number; y: number }): void {
     if (this.isDestroyed) return;
     this.clearCanvas();
+
+    if (isWiping !== undefined) {
+      this.isWiping = isWiping;
+    }
+    if (pointerPos !== undefined) {
+      this.pointerPos = pointerPos;
+    }
+
+    // Apply wipe filtering of drops & droplets with path interpolation
+    if (this.isWiping && this.pointerPos) {
+      const WIPE_RADIUS = 30; // Reduced radius for a finger
+      const px = this.pointerPos.x;
+      const py = this.pointerPos.y;
+
+      if (this.lastPointerPos) {
+        const lpx = this.lastPointerPos.x;
+        const lpy = this.lastPointerPos.y;
+
+        const dx = px - lpx;
+        const dy = py - lpy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // Interpolate points along the drag path
+        const steps = Math.max(1, Math.floor(dist / 10));
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const ix = lpx + dx * t;
+          const iy = lpy + dy * t;
+
+          this.drops = this.drops.filter((drop) => {
+            const dX = drop.x - ix;
+            const dY = drop.y - iy;
+            return Math.sqrt(dX * dX + dY * dY) >= WIPE_RADIUS;
+          });
+
+          this.clearDroplets(ix, iy, WIPE_RADIUS);
+        }
+      } else {
+        this.drops = this.drops.filter((drop) => {
+          const dx = drop.x - px;
+          const dy = drop.y - py;
+          return Math.sqrt(dx * dx + dy * dy) >= WIPE_RADIUS;
+        });
+        this.clearDroplets(px, py, WIPE_RADIUS);
+      }
+
+      this.lastPointerPos = { x: px, y: py };
+    } else {
+      this.lastPointerPos = null;
+    }
 
     const now = Date.now();
     if (this.lastRender === null) this.lastRender = now;
@@ -532,7 +585,7 @@ export default class Raindrops {
 
     this.updateDrops(timeScale);
 
-    this.animId = requestAnimationFrame(this.update.bind(this));
+    this.animId = requestAnimationFrame(() => this.update());
   }
 
   public resize(width: number, height: number, scale: number): void {

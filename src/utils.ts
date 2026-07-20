@@ -359,7 +359,13 @@ export function getTextStyles(block: any, isDescription = false, isPremium = tru
   }
   
   if (source.textItalic !== undefined) {
-    styles.fontStyle = source.textItalic ? 'italic' : 'normal';
+    if (source.textItalic) {
+      styles.fontStyle = 'italic';
+      styles.paddingRight = '0.15em';
+      styles.marginRight = '-0.15em';
+    } else {
+      styles.fontStyle = 'normal';
+    }
   }
   
   if (source.textUnderline !== undefined) {

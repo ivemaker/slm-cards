@@ -600,7 +600,9 @@ export default function RainOfArthurPage({ children, onAnalyserReady }: RainOfAr
   } | null>(null);
   const [isControllerCollapsed, setIsControllerCollapsed] = useState<boolean>(false);
   const [autoGlide, setAutoGlide] = useState<boolean>(true);
-  const [pointerMode, setPointerMode] = useState<"draw" | "drag">("draw");
+
+  const isWipingRef = useRef<boolean>(false);
+  const pointerPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Telemetry metric states (pure styling to satisfy literal dashboard data request)
   const [activeRaindropsCount, setActiveRaindropsCount] = useState<number>(0);
@@ -1060,6 +1062,8 @@ export default function RainOfArthurPage({ children, onAnalyserReady }: RainOfAr
           // Track active raindrops telemetry count for visual dashboard
           if (raindropsRef.current) {
             setActiveRaindropsCount(raindropsRef.current.drops.length);
+            raindropsRef.current.isWiping = isWipingRef.current;
+            raindropsRef.current.pointerPos = pointerPosRef.current;
           }
 
           // Calculate FPS metrics
@@ -1894,32 +1898,85 @@ export default function RainOfArthurPage({ children, onAnalyserReady }: RainOfAr
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [phases, isCycleActive, triggerManualLightning, transitionToPreset]);
 
-  // 6. Draw/Click handler on dynamic pane
-  const handlePointerAction = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas || !raindropsRef.current) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const dpi = window.devicePixelRatio || 1;
-    
-    // Scale client coordinate down to localized virtual size
-    const x = (event.clientX - rect.left) * dpi;
-    const y = (event.clientY - rect.top) * dpi;
-
-    // Check click mode representation
-    const radiusSize = pointerMode === "draw" ? random(16, 28) : random(8, 14);
-    
-    raindropsRef.current.addDrop(
-      raindropsRef.current.createDrop({
-        x: x / dpi,
-        y: y / dpi,
-        r: radiusSize,
-        momentum: pointerMode === "drag" ? 0.8 : 0.0,
-        spreadX: 1.2,
-        spreadY: 1.2
-      })
-    );
+  const isInteractiveElement = (target: HTMLElement | null): boolean => {
+    let curr = target;
+    while (curr && curr !== document.body) {
+      const tagName = curr.tagName.toLowerCase();
+      if (
+        tagName === "button" ||
+        tagName === "input" ||
+        tagName === "a" ||
+        tagName === "select" ||
+        tagName === "textarea" ||
+        curr.classList.contains("cursor-pointer") ||
+        curr.getAttribute("role") === "button"
+      ) {
+        return true;
+      }
+      if (
+        tagName === "section" ||
+        curr.id === "weather-cockpit" ||
+        curr.classList.contains("bg-black/55")
+      ) {
+        return true;
+      }
+      curr = curr.parentElement;
+    }
+    return false;
   };
+
+  // 6. Window-level Glass Wiping pointer events
+  const updateWipingPositionFromEvent = (clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    
+    const canvasX = (clientX - rect.left) * dpr;
+    const canvasY = (clientY - rect.top) * dpr;
+    const x = canvasX / dpr;
+    const y = canvasY / dpr;
+    
+    pointerPosRef.current = { x, y };
+    if (raindropsRef.current) {
+      raindropsRef.current.pointerPos = pointerPosRef.current;
+    }
+  };
+
+  useEffect(() => {
+    const handleWindowPointerDown = (event: PointerEvent) => {
+      if (isInteractiveElement(event.target as HTMLElement)) return;
+      isWipingRef.current = true;
+      if (raindropsRef.current) {
+        raindropsRef.current.isWiping = true;
+      }
+      updateWipingPositionFromEvent(event.clientX, event.clientY);
+    };
+
+    const handleWindowPointerMove = (event: PointerEvent) => {
+      if (!isWipingRef.current) return;
+      updateWipingPositionFromEvent(event.clientX, event.clientY);
+    };
+
+    const handleWindowPointerUp = () => {
+      isWipingRef.current = false;
+      if (raindropsRef.current) {
+        raindropsRef.current.isWiping = false;
+      }
+    };
+
+    window.addEventListener("pointerdown", handleWindowPointerDown, { passive: true });
+    window.addEventListener("pointermove", handleWindowPointerMove, { passive: true });
+    window.addEventListener("pointerup", handleWindowPointerUp, { passive: true });
+    window.addEventListener("pointercancel", handleWindowPointerUp, { passive: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", handleWindowPointerDown);
+      window.removeEventListener("pointermove", handleWindowPointerMove);
+      window.removeEventListener("pointerup", handleWindowPointerUp);
+      window.removeEventListener("pointercancel", handleWindowPointerUp);
+    };
+  }, []);
 
   // Clean canvas wiping
   const handleClearCanvas = () => {
@@ -2028,15 +2085,14 @@ export default function RainOfArthurPage({ children, onAnalyserReady }: RainOfAr
   };
 
   return (
-    <div ref={containerRef} className="fixed top-16 left-0 right-0 bottom-0 w-full overflow-hidden bg-zinc-950 font-sans select-none z-10">
+    <div 
+      ref={containerRef} 
+      className="fixed top-16 left-0 right-0 bottom-0 w-full overflow-hidden bg-zinc-950 font-sans select-none z-10"
+    >
       
       {/* 1. Master WebGL Simulation Canvas */}
       <canvas
         ref={canvasRef}
-        onPointerDown={handlePointerAction}
-        onPointerMove={(e) => {
-          if (e.buttons === 1) handlePointerAction(e); // user is dragging
-        }}
         className="absolute inset-0 cursor-crosshair z-0 block"
         style={{ touchAction: "none" }}
       />
@@ -2949,38 +3005,19 @@ export default function RainOfArthurPage({ children, onAnalyserReady }: RainOfAr
           </button>
         </div>
 
-        {/* 5. Draw / Drag manual interaction guide */}
+        {/* 5. Draw / Drag / Wipe manual interaction guide */}
         <div className="bg-white/5 p-3 rounded-2xl border border-white/5 pointer-events-auto">
           <div className="flex items-center justify-between text-xs font-semibold text-zinc-300">
             <span className="flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-spin" />
-              Interactive Windshield
+              Интерактивное стекло
             </span>
-            <div className="flex gap-1">
-              <button
-                onClick={() => setPointerMode("draw")}
-                className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-mono ${
-                  pointerMode === "draw"
-                    ? "bg-cyan-400 text-black font-bold"
-                    : "bg-zinc-800 text-zinc-400"
-                }`}
-              >
-                Drop Splashes
-              </button>
-              <button
-                onClick={() => setPointerMode("drag")}
-                className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-mono ${
-                  pointerMode === "drag"
-                    ? "bg-cyan-400 text-black font-bold"
-                    : "bg-zinc-800 text-zinc-400"
-                }`}
-              >
-                Grip Drag
-              </button>
-            </div>
+            <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-mono bg-cyan-400 text-black font-bold">
+              Протирка активна
+            </span>
           </div>
-          <p className="text-[10px] text-zinc-400 mt-1.5 leading-normal">
-            Click, hold, or drag across the glass pane to draw large custom water droplets that physically collide and merge with falling raindrops!
+          <p className="text-[10px] text-zinc-400 mt-1.5 leading-normal min-h-[40px]">
+            Зажмите левую кнопку мыши (или коснитесь экрана пальцем) и проведите по экрану в любом месте, чтобы протереть стекло от капель воды и конденсата!
           </p>
         </div>
         </section>
