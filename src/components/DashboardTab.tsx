@@ -50,6 +50,38 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ lang }) => {
   const [telegramUsername, setTelegramUsername] = React.useState(activeProject?.telegramUsername || '');
 
   const [showPublishModal, setShowPublishModal] = React.useState(false);
+  const [tick, setTick] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!activeProject || activeProject.tariff !== 'Basic' || !activeProject.premiumExpiredAt) {
+      return;
+    }
+    const interval = setInterval(() => {
+      setTick(t => t + 1);
+    }, 30000); // every 30 seconds
+    return () => clearInterval(interval);
+  }, [activeProject?.id, activeProject?.tariff, activeProject?.premiumExpiredAt]);
+
+  const getGracePeriodTimeLeft = () => {
+    if (!activeProject || activeProject.tariff !== 'Basic' || !activeProject.premiumExpiredAt) {
+      return null;
+    }
+    const expiredDate = new Date(activeProject.premiumExpiredAt).getTime();
+    const GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+    const timeLeftMs = GRACE_PERIOD_MS - (Date.now() - expiredDate);
+
+    if (timeLeftMs <= 0) {
+      return null;
+    }
+
+    const totalHours = Math.floor(timeLeftMs / (1000 * 60 * 60));
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+
+    return { days, hours };
+  };
+
+  const timeLeft = getGracePeriodTimeLeft();
 
   const handlePublishClick = () => {
     if (!activeProject) return;
@@ -722,6 +754,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ lang }) => {
                     <ExternalLink className="w-5 h-5 group-hover:scale-110 transition-transform" />
                   </a>
                 </div>
+                {timeLeft && (
+                  <div className="flex items-center gap-1.5 mt-2 text-xs text-amber-500 font-light" id="grace-period-timer">
+                    <span>⏳ {lang === 'en' ? `Domain will turn off in: ${timeLeft.days} d. ${timeLeft.hours} h.` : `Домен отключится через: ${timeLeft.days} д. ${timeLeft.hours} ч.`}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -20,7 +20,6 @@ export interface MockProject {
   hasUnpublishedChanges?: boolean;
   cart?: { blockId: string; name: string; price: number; quantity: number }[];
   customDomain?: string;
-  subdomain?: string;
   premiumExpiredAt?: string;
 }
 
@@ -50,6 +49,13 @@ export interface DevContextType {
   developerMode: boolean;
   setDeveloperMode: (mode: boolean) => void;
   getProjectUrl: (project: MockProject) => string;
+  projectBackup: MockProject | null;
+  setProjectBackup: (backup: MockProject | null) => void;
+  previewScope: 'all' | 'blocks' | 'backgrounds';
+  setPreviewScope: (scope: 'all' | 'blocks' | 'backgrounds') => void;
+  startPreview: () => void;
+  cancelPreview: () => void;
+  applyPreviewTemplate: () => void;
 }
 
 const DevContext = createContext<DevContextType | undefined>(undefined);
@@ -72,6 +78,30 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [activeProjectId, setActiveProjectIdState] = useState<string | null>(() => getSaved<string | null>('slm_active_project_id', null));
   const [isSaving, setIsSaving] = useState(false);
   const [developerMode, setDeveloperMode] = useState<boolean>(() => getSaved<boolean>('slm_developer_mode', false));
+
+  const [projectBackup, setProjectBackup] = useState<MockProject | null>(null);
+  const [previewScope, setPreviewScope] = useState<'all' | 'blocks' | 'backgrounds'>('all');
+
+  const startPreview = () => {
+    const activeProj = projects.find(p => p.id === activeProjectId);
+    if (activeProj) {
+      setProjectBackup(JSON.parse(JSON.stringify(activeProj)));
+    }
+    setActiveTab('preview');
+  };
+
+  const cancelPreview = () => {
+    if (projectBackup) {
+      setProjects(prev => prev.map(p => p.id === projectBackup.id ? JSON.parse(JSON.stringify(projectBackup)) : p));
+    }
+    setProjectBackup(null);
+    setActiveTab('editor');
+  };
+
+  const applyPreviewTemplate = () => {
+    setProjectBackup(null);
+    setActiveTab('editor');
+  };
 
   const [projects, setProjects] = useState<MockProject[]>(() => {
     const saved = getSaved<any[]>('slm_projects', []);
@@ -144,7 +174,6 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           return {
             ...p,
             customDomain: undefined,
-            subdomain: undefined,
             premiumExpiredAt: undefined
           };
         }
@@ -161,24 +190,23 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const isPremium = project.tariff === 'Premium';
     let isGracePeriodActive = false;
 
-    if ((project.tariff === 'Basic' || project.tariff === 'Unpaid') && project.premiumExpiredAt) {
+    if (project.tariff === 'Basic' && project.premiumExpiredAt) {
       const expiredDate = new Date(project.premiumExpiredAt).getTime();
       const GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
-      if (Date.now() - expiredDate <= GRACE_PERIOD_MS) {
+      const elapsed = Date.now() - expiredDate;
+      if (elapsed >= 0 && elapsed < GRACE_PERIOD_MS) {
         isGracePeriodActive = true;
       }
     }
 
-    const canUseCustomUrl = isPremium || isGracePeriodActive;
-
-    if (canUseCustomUrl) {
-      if (project.customDomain) {
-        return `https://${project.customDomain}`;
-      }
-      if (project.subdomain) {
-        return `https://${project.subdomain}.slmcards.io`;
-      }
+    if (isPremium && project.customDomain) {
+      return `https://${project.customDomain}`;
     }
+
+    if (project.tariff === 'Basic' && project.customDomain && isGracePeriodActive) {
+      return `https://${project.customDomain}`;
+    }
+
     return `https://slmcards.io/${project.id}`;
   };
 
@@ -289,7 +317,14 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         isSaving,
         developerMode,
         setDeveloperMode,
-        getProjectUrl
+        getProjectUrl,
+        projectBackup,
+        setProjectBackup,
+        previewScope,
+        setPreviewScope,
+        startPreview,
+        cancelPreview,
+        applyPreviewTemplate
       }}
     >
       {children}

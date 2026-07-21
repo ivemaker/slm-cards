@@ -19,7 +19,6 @@ export const DevPanel: React.FC = () => {
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [tempDomain, setTempDomain] = useState<string>('');
-  const [tempSubdomain, setTempSubdomain] = useState<string>('');
   const [showConfirmReset, setShowConfirmReset] = useState<boolean>(false);
 
   const activeProject = projects.find(p => p.id === activeProjectId);
@@ -27,9 +26,8 @@ export const DevPanel: React.FC = () => {
   React.useEffect(() => {
     if (activeProject) {
       setTempDomain(activeProject.customDomain || '');
-      setTempSubdomain(activeProject.subdomain || '');
     }
-  }, [activeProject?.customDomain, activeProject?.subdomain, activeProjectId]);
+  }, [activeProject?.customDomain, activeProjectId]);
 
   const handleResetLocalStorage = () => {
     localStorage.clear();
@@ -68,15 +66,6 @@ export const DevPanel: React.FC = () => {
         customDomain: tempDomain || undefined
       });
       toastSuccess('Custom Domain обновлен');
-    }
-  };
-
-  const applySubdomain = () => {
-    if (activeProjectId) {
-      updateProject(activeProjectId, {
-        subdomain: tempSubdomain || undefined
-      });
-      toastSuccess('Subdomain обновлен');
     }
   };
 
@@ -267,7 +256,7 @@ export const DevPanel: React.FC = () => {
                 ⏩ Перемотать на 8 дней вперед
               </button>
             </div>
-            <div className="space-y-2 mb-4">
+             <div className="space-y-2 mb-4">
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -277,16 +266,6 @@ export const DevPanel: React.FC = () => {
                   className="flex-1 bg-zinc-950 border border-zinc-800 text-[10px] rounded p-1.5 text-white focus:outline-none"
                 />
                 <button onClick={applyCustomDomain} className="bg-zinc-800 text-[10px] px-2 rounded hover:bg-zinc-700">Set</button>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Subdomain (mybrand)"
-                  value={tempSubdomain}
-                  onChange={(e) => setTempSubdomain(e.target.value)}
-                  className="flex-1 bg-zinc-950 border border-zinc-800 text-[10px] rounded p-1.5 text-white focus:outline-none"
-                />
-                <button onClick={applySubdomain} className="bg-zinc-800 text-[10px] px-2 rounded hover:bg-zinc-700">Set</button>
               </div>
             </div>
           </div>

@@ -91,7 +91,7 @@ import {
   PLACEHOLDERS 
 } from './templates';
 
-import { PublicPreviewControls } from './components/PublicPreviewControls';
+import { PreviewDock } from './components/PreviewDock';
 import { LayersPanel } from './components/LayersPanel';
 import { BlockInspector } from './components/BlockInspector';
 import { BackgroundEffects } from './components/BackgroundEffects';
@@ -166,6 +166,17 @@ const stripLargeBase64AndStrings = (obj: any, keyName?: string): any => {
     return cleaned;
   }
   return obj;
+};
+
+const filterUniqueTemplates = (templates: any[]) => {
+  if (!Array.isArray(templates)) return [];
+  const seen = new Set<string>();
+  return templates.filter(t => {
+    if (!t || !t.id) return false;
+    if (seen.has(t.id)) return false;
+    seen.add(t.id);
+    return true;
+  });
 };
 
 const cleanTemplateConfig = (template: any) => {
@@ -722,6 +733,7 @@ export default function App() {
             const newToAdd = cleaned.filter(t => !existingIds.has(t.id));
             readyList = [...readyList, ...newToAdd];
             
+            readyList = filterUniqueTemplates(readyList);
             try {
               set('nocode_custom_ready_templates', readyList).catch(e => console.error(e));
               set('nocode_user_templates', []).catch(e => console.error(e));
@@ -733,6 +745,7 @@ export default function App() {
           }
         } catch (e) {}
       }
+      readyList = filterUniqueTemplates(readyList);
       localStorage.setItem('nocode_migrated_v6_final', 'true');
     }
   } catch (err) {
@@ -740,7 +753,24 @@ export default function App() {
   }
 
   // Navigation tabs: 'landing' | 'projects' | 'editor' | 'dashboard' | 'preview'
-  const { isAuthenticated, login, logout, planType, activeTab, setActiveTab, activeProjectId, projects, developerMode, updateProject, getProjectUrl } = useDev();
+  const { 
+    isAuthenticated, 
+    login, 
+    logout, 
+    planType, 
+    activeTab, 
+    setActiveTab, 
+    activeProjectId, 
+    projects, 
+    developerMode, 
+    updateProject, 
+    getProjectUrl,
+    projectBackup,
+    previewScope,
+    startPreview,
+    cancelPreview,
+    applyPreviewTemplate
+  } = useDev();
   const activeProjectForPremiumCheck = projects.find(p => p.id === activeProjectId);
   const isPremium = activeProjectForPremiumCheck ? (activeProjectForPremiumCheck.tariff === 'Premium') : (planType === 'premium');
   const toast = useToast();
@@ -1003,8 +1033,7 @@ export default function App() {
           }
         });
 
-        const mergedTemplates = Array.from(templateMap.values()).map(cleanTemplateConfig);
-        setCustomReadyTemplates(mergedTemplates);
+        let mergedTemplates = Array.from(templateMap.values()).map(cleanTemplateConfig);
 
         const savedUser = await get('nocode_user_templates') ?? localStorage.getItem('nocode_user_templates');
         let parsedUser = typeof savedUser === 'string' ? JSON.parse(savedUser) : savedUser;
@@ -1027,7 +1056,50 @@ export default function App() {
           }
         }
 
-        setUserTemplates(parsedUser.map(cleanTemplateConfig));
+        // Auto-migrate all existing client-side user templates to permanent server-side ready templates database
+        if (parsedUser.length > 0) {
+          console.log('Migrating existing user templates to server ready templates:', parsedUser);
+          for (const tpl of parsedUser) {
+            let newId = tpl.id;
+            if (newId.startsWith('user-')) {
+              newId = 'ready-' + newId.replace('user-', '');
+            } else if (!newId.startsWith('ready-') && !newId.startsWith('tpl-')) {
+              newId = 'ready-' + newId;
+            }
+
+            const transferredTemplate = {
+              ...tpl,
+              id: newId,
+              isUserTemplate: false,
+              descriptionEn: tpl.descriptionEn || 'Transferred custom template',
+              descriptionRu: tpl.descriptionRu || 'Перенесенный пользовательский шаблон'
+            };
+            const cleaned = cleanTemplateConfig(transferredTemplate);
+
+            try {
+              await fetch('/api/custom-ready-templates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cleaned)
+              });
+              if (!mergedTemplates.some(t => t.id === cleaned.id)) {
+                mergedTemplates.push(cleaned);
+              }
+            } catch (apiErr) {
+              console.warn('Failed to auto-migrate user template to server ready templates:', apiErr);
+            }
+          }
+
+          // Clear client-side user templates after successful migration
+          parsedUser = [];
+          try {
+            localStorage.setItem('nocode_user_templates', JSON.stringify([]));
+            set('nocode_user_templates', []).catch(e => console.error(e));
+          } catch (e) {}
+        }
+
+        setCustomReadyTemplates(filterUniqueTemplates(mergedTemplates));
+        setUserTemplates(filterUniqueTemplates(parsedUser.map(cleanTemplateConfig)));
 
       } catch (err) {
         console.error('Failed to load data from storage', err);
@@ -1196,12 +1268,12 @@ export default function App() {
   const [toggleDice, setToggleDice] = useState(false);
   const [originalConfigAtPreviewStart, setOriginalConfigAtPreviewStart] = useState<ProjectConfig | null>(null);
 
-  // Re-apply current theme when settings change for live preview
+  // Re-apply current theme when scope changes for live preview
   useEffect(() => {
     if (activeTab === 'preview' && activeThemeIndex !== -1) {
       applyThemeAtIndex(activeThemeIndex);
     }
-  }, [toggleBack, toggleCards]);
+  }, [previewScope]);
 
   // Sync original config when entering preview
   useEffect(() => {
@@ -1229,14 +1301,6 @@ export default function App() {
   ];
 
   const handleNextTheme = () => {
-    if (!toggleBack && !toggleCards) return;
-    
-    if (toggleDice) {
-      const randomTheme = generateRandomThemeConfig();
-      applyRandomTheme(randomTheme);
-      return;
-    }
-
     const nextIndex = (activeThemeIndex + 1) % publicThemes.length;
     applyThemeAtIndex(nextIndex);
   };
@@ -1423,43 +1487,60 @@ export default function App() {
   };
 
   const handlePrevTheme = () => {
-    if (!toggleBack && !toggleCards || activeThemeIndex === 0) return;
-    
-    let prevIndex;
-    if (activeThemeIndex === -1) {
-      prevIndex = 0; // Go back to original from random
-    } else {
-      prevIndex = (activeThemeIndex - 1 + publicThemes.length) % publicThemes.length;
-    }
+    if (activeThemeIndex === 0) return;
+    const prevIndex = (activeThemeIndex - 1 + publicThemes.length) % publicThemes.length;
     applyThemeAtIndex(prevIndex);
   };
 
   const applyThemeAtIndex = (index: number) => {
+    setActiveThemeIndex(index);
+
+    // Index 0: This is always original project (backup).
+    if (index === 0) {
+      setActiveThemeName(lang === 'en' ? 'My Design' : 'Мой дизайн');
+      if (originalConfigAtPreviewStart) {
+        setConfigs(prev => ({
+          ...prev,
+          [templateType]: JSON.parse(JSON.stringify(originalConfigAtPreviewStart))
+        }));
+      }
+      if (projectBackup && activeProjectId) {
+        updateProject(activeProjectId, JSON.parse(JSON.stringify(projectBackup)));
+      }
+      return;
+    }
+
     const theme = publicThemes[index];
     if (!theme || !theme.config) return;
 
-    setActiveThemeIndex(index);
     setActiveThemeName(theme.name || '');
     
     setConfigs(prev => {
       const current = JSON.parse(JSON.stringify(prev[templateType]));
       const newConfig = JSON.parse(JSON.stringify(theme.config));
 
-      if (toggleBack && newConfig.mainBg) {
+      const shouldApplyBg = previewScope === 'all' || previewScope === 'backgrounds';
+      const shouldApplyBlocks = previewScope === 'all' || previewScope === 'blocks';
+
+      if (shouldApplyBg && newConfig.mainBg) {
         current.mainBg = newConfig.mainBg;
         if (newConfig.designTemplate !== undefined) {
           current.designTemplate = newConfig.designTemplate;
         }
       }
 
-      if (toggleCards && newConfig.blockDefaults) {
-        // Apply block defaults to all blocks
-        current.blocks = current.blocks.map((b: any) => {
-          const updated = { ...b, ...newConfig.blockDefaults };
-          // If the template has a specific theme (modern/mono/serif), apply it too
-          if (newConfig.theme) updated.theme = newConfig.theme;
-          return updated;
-        });
+      if (shouldApplyBlocks) {
+        if (newConfig.blocks) {
+          current.blocks = newConfig.blocks;
+        } else if (newConfig.blockDefaults) {
+          // Apply block defaults to all blocks
+          current.blocks = current.blocks.map((b: any) => {
+            const updated = { ...b, ...newConfig.blockDefaults };
+            // If the template has a specific theme (modern/mono/serif), apply it too
+            if (newConfig.theme) updated.theme = newConfig.theme;
+            return updated;
+          });
+        }
         if (newConfig.theme) current.theme = newConfig.theme;
       }
 
@@ -2914,6 +2995,18 @@ export default function App() {
     }
   };
 
+  const handleUpdateUserTemplates = (newTemplates: any[]) => {
+    try {
+      setUserTemplates(filterUniqueTemplates(newTemplates));
+      set('nocode_user_templates', newTemplates).catch(e => console.error(e));
+      try {
+        localStorage.setItem('nocode_user_templates', JSON.stringify(newTemplates));
+      } catch (e) { console.warn('localStorage full'); }
+    } catch (err) {
+      console.error("Error updating user templates:", err);
+    }
+  };
+
   const handleDeleteReadyTemplate = async (id: string) => {
     try {
       const updated = customReadyTemplates.filter(t => t.id !== id);
@@ -2933,7 +3026,7 @@ export default function App() {
 
   const handleUpdateReadyTemplates = async (newTemplates: any[]) => {
     try {
-      setCustomReadyTemplates(newTemplates);
+      setCustomReadyTemplates(filterUniqueTemplates(newTemplates));
 
       try {
         await fetch(`/api/custom-ready-templates`, {
@@ -3101,6 +3194,108 @@ export default function App() {
     } catch (err) {
       console.error("Error adding ready template:", err);
       showToast(lang === 'en' ? 'Error saving ready template' : 'Ошибка при добавлении в готовые шаблоны');
+    }
+  };
+
+  const handleTransferUserTemplateToReady = async (tpl: any) => {
+    try {
+      let newId = tpl.id;
+      if (newId.startsWith('user-')) {
+        newId = 'ready-' + newId.replace('user-', '');
+      } else if (!newId.startsWith('ready-') && !newId.startsWith('tpl-')) {
+        newId = 'ready-' + newId;
+      }
+
+      const transferredTemplate = {
+        ...tpl,
+        id: newId,
+        isUserTemplate: false,
+        descriptionEn: tpl.descriptionEn || 'Transferred custom template',
+        descriptionRu: tpl.descriptionRu || 'Перенесенный пользовательский шаблон'
+      };
+
+      const cleaned = cleanTemplateConfig(transferredTemplate);
+      const updatedReady = [...customReadyTemplates.filter(t => t.id !== cleaned.id), cleaned];
+      setCustomReadyTemplates(filterUniqueTemplates(updatedReady));
+
+      try {
+        await fetch('/api/custom-ready-templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cleaned)
+        });
+      } catch (apiErr) {
+        console.warn('Failed to save ready template via API', apiErr);
+      }
+
+      const updatedUser = userTemplates.filter(t => t.id !== tpl.id);
+      setUserTemplates(updatedUser);
+      set('nocode_user_templates', updatedUser).catch(e => console.error(e));
+      try {
+        localStorage.setItem('nocode_user_templates', JSON.stringify(updatedUser));
+      } catch (e) { console.warn('localStorage full'); }
+
+      showToast(lang === 'en' ? 'Template transferred to ready templates!' : 'Шаблон успешно перенесен в готовые!');
+    } catch (err) {
+      console.error('Error transferring template:', err);
+      showToast(lang === 'en' ? 'Error transferring template' : 'Ошибка при переносе шаблона');
+    }
+  };
+
+  const handleTransferAllUserTemplatesToReady = async () => {
+    if (userTemplates.length === 0) return;
+
+    try {
+      const migratedList: any[] = [];
+      const updatedReady = [...customReadyTemplates];
+
+      for (const tpl of userTemplates) {
+        let newId = tpl.id;
+        if (newId.startsWith('user-')) {
+          newId = 'ready-' + newId.replace('user-', '');
+        } else if (!newId.startsWith('ready-') && !newId.startsWith('tpl-')) {
+          newId = 'ready-' + newId;
+        }
+
+        const transferredTemplate = {
+          ...tpl,
+          id: newId,
+          isUserTemplate: false,
+          descriptionEn: tpl.descriptionEn || 'Transferred custom template',
+          descriptionRu: tpl.descriptionRu || 'Перенесенный пользовательский шаблон'
+        };
+        const cleaned = cleanTemplateConfig(transferredTemplate);
+        migratedList.push(cleaned);
+
+        if (!updatedReady.some(t => t.id === cleaned.id)) {
+          updatedReady.push(cleaned);
+        }
+      }
+
+      for (const cleaned of migratedList) {
+        try {
+          await fetch('/api/custom-ready-templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cleaned)
+          });
+        } catch (apiErr) {
+          console.warn('Failed to save ready template via API', apiErr);
+        }
+      }
+
+      setCustomReadyTemplates(filterUniqueTemplates(updatedReady));
+
+      setUserTemplates([]);
+      set('nocode_user_templates', []).catch(e => console.error(e));
+      try {
+        localStorage.setItem('nocode_user_templates', JSON.stringify([]));
+      } catch (e) {}
+
+      showToast(lang === 'en' ? 'All templates transferred to ready templates!' : 'Все шаблоны успешно перенесены в готовые!');
+    } catch (err) {
+      console.error('Error transferring all templates:', err);
+      showToast(lang === 'en' ? 'Error transferring templates' : 'Ошибка при переносе шаблонов');
     }
   };
 
@@ -5677,7 +5872,7 @@ export default function App() {
                 {activeTab === 'editor' && activeProjectId && (
                   <button
                     onClick={() => {
-                      setActiveTab('preview');
+                      startPreview();
                       // Simulate views growth
                       updateConfigField('views', config.views + 1);
                       setIsBurgerMenuOpen(false);
@@ -5709,7 +5904,7 @@ export default function App() {
               {isAuthenticated && activeProjectId && activeTab !== 'projects' && activeTab !== 'landing' && (
                 <button
                   onClick={() => {
-                    setActiveTab('preview');
+                    startPreview();
                     // Simulate views growth
                     updateConfigField('views', config.views + 1);
                     setIsBurgerMenuOpen(false);
@@ -6039,7 +6234,10 @@ export default function App() {
                 isDevMode={developerMode}
                 onDeleteReadyTemplate={handleDeleteReadyTemplate}
                 onUpdateReadyTemplates={handleUpdateReadyTemplates}
+                onUpdateUserTemplates={handleUpdateUserTemplates}
                 onAddReadyTemplate={handleSaveReadyTemplate}
+                onTransferUserTemplateToReady={handleTransferUserTemplateToReady}
+                onTransferAllUserTemplatesToReady={handleTransferAllUserTemplatesToReady}
                 updateBlocks={updateBlocks}
               />
             </div>
@@ -6606,28 +6804,25 @@ export default function App() {
               <div className="fixed bottom-0 left-0 right-0 h-36 bg-gradient-to-t from-zinc-950/95 via-zinc-950/60 to-transparent backdrop-blur-[1px] pointer-events-none z-[240]" />
 
               <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[250] select-none">
-                <PublicPreviewControls 
-                  activeDevice={viewMode}
-                  onDeviceChange={setViewMode}
-                  onBack={() => setActiveTab('editor')}
+                <PreviewDock 
+                  activeDevice={viewMode === 'desktop' ? 'none' : viewMode}
+                  onDeviceChange={(dev) => setViewMode(dev === 'none' ? 'desktop' : dev)}
                   lang={lang}
+                  activeIndex={activeThemeIndex}
                   onNextTheme={handleNextTheme}
                   onPrevTheme={handlePrevTheme}
-                  canGoNext={(toggleBack || toggleCards) && (toggleDice || activeThemeIndex < publicThemes.length - 1)}
-                  canGoPrev={activeThemeIndex !== 0}
-                  toggleBack={toggleBack}
-                  toggleCards={toggleCards}
-                  toggleDice={toggleDice}
-                  onToggleBack={() => setToggleBack(!toggleBack)}
-                  onToggleCards={() => setToggleCards(!toggleCards)}
-                  onToggleDice={() => setToggleDice(!toggleDice)}
                   isLiked={isThemeLiked}
-                  onLike={handleLike}
-                  showLike={activeThemeIndex !== 0}
-                  onMenuToggle={setIsPreviewMenuOpen}
-                  onResetTheme={() => applyThemeAtIndex(0)}
-                  onShowApplyConfirm={() => setShowApplyConfirm(true)}
-                  activeIndex={activeThemeIndex}
+                  onLike={() => {
+                    handleSaveCurrentStyle();
+                    handleLike();
+                  }}
+                  onCancel={cancelPreview}
+                  onApply={() => {
+                    saveToLocalStorage(configs);
+                    setOriginalConfigAtPreviewStart(null);
+                    applyPreviewTemplate();
+                  }}
+                  maxIndex={publicThemes.length - 1}
                 />
               </div>
 

@@ -49,7 +49,10 @@ interface LayersPanelProps {
   isDevMode?: boolean;
   onDeleteReadyTemplate?: (id: string) => void;
   onUpdateReadyTemplates?: (templates: any[]) => void;
+  onUpdateUserTemplates?: (templates: any[]) => void;
   onAddReadyTemplate?: () => void;
+  onTransferUserTemplateToReady?: (tpl: any) => void;
+  onTransferAllUserTemplatesToReady?: () => void;
   updateBlocks: (newBlocks: Block[], skipHistory?: boolean) => void;
 }
 
@@ -85,7 +88,10 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
   isDevMode = false,
   onDeleteReadyTemplate,
   onUpdateReadyTemplates,
+  onUpdateUserTemplates,
   onAddReadyTemplate,
+  onTransferUserTemplateToReady,
+  onTransferAllUserTemplatesToReady,
   updateBlocks,
 }) => {
   const [isLayersExpanded, setIsLayersExpanded] = React.useState(true);
@@ -165,6 +171,8 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
   const [dragOverPresetId, setDragOverPresetId] = React.useState<string | null>(null);
   const [editingPresetId, setEditingPresetId] = React.useState<string | null>(null);
   const [editingPresetName, setEditingPresetName] = React.useState('');
+  const [editingUserTemplateId, setEditingUserTemplateId] = React.useState<string | null>(null);
+  const [editingUserTemplateName, setEditingUserTemplateName] = React.useState('');
 
   const checkIsActive = (preset: any) => {
     if (!preset) return false;
@@ -773,21 +781,12 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                             )}
                           </div>
 
-                          {/* Name (with double click to rename in dev mode) */}
-                          <div 
-                            className="w-full mt-1.5"
-                            onDoubleClick={(e) => {
-                              if (isDevMode && onUpdateReadyTemplates) {
-                                e.stopPropagation();
-                                setEditingPresetId(preset.id);
-                                setEditingPresetName(lang === 'en' ? (preset.nameEn || preset.nameRu) : (preset.nameRu || preset.nameEn));
-                              }
-                            }}
-                          >
+                          {/* Name (with single click to rename in dev mode) */}
+                          <div className="w-full mt-1.5">
                             {editingPresetId === preset.id ? (
                               <input
                                 autoFocus
-                                className="w-full text-[9px] font-semibold text-center text-zinc-900 border border-purple-500 rounded px-0.5 py-0.5 outline-none"
+                                className="w-full text-[9px] font-semibold text-center text-zinc-900 border border-purple-500 rounded px-0.5 py-0.5 outline-none bg-white"
                                 value={editingPresetName}
                                 onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => setEditingPresetName(e.target.value)}
@@ -832,8 +831,15 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                               />
                             ) : (
                               <span 
-                                className="text-[9px] font-semibold text-zinc-800 truncate w-full block cursor-text"
-                                title={isDevMode ? "Double-click to rename" : ""}
+                                className={`text-[9px] font-semibold text-zinc-800 truncate w-full block ${isDevMode ? 'cursor-text hover:text-purple-600' : ''}`}
+                                title={isDevMode ? (lang === 'en' ? "Click to rename" : "Кликните для переименования") : ""}
+                                onClick={(e) => {
+                                  if (isDevMode && onUpdateReadyTemplates) {
+                                    e.stopPropagation();
+                                    setEditingPresetId(preset.id);
+                                    setEditingPresetName(lang === 'en' ? (preset.nameEn || preset.nameRu) : (preset.nameRu || preset.nameEn));
+                                  }
+                                }}
                               >
                                 {(() => {
                                   const name = lang === 'en' ? (preset.nameEn || preset.nameRu) : (preset.nameRu || preset.nameEn);
@@ -922,16 +928,7 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                           {/* Text on right */}
                           <div className="flex-1 min-w-0 flex items-center justify-between gap-1">
                             {/* Name input/span */}
-                            <div 
-                              className="flex-1 min-w-0"
-                              onDoubleClick={(e) => {
-                                if (isDevMode && onUpdateReadyTemplates) {
-                                  e.stopPropagation();
-                                  setEditingPresetId(preset.id);
-                                  setEditingPresetName(lang === 'en' ? (preset.nameEn || preset.nameRu) : (preset.nameRu || preset.nameEn));
-                                }
-                              }}
-                            >
+                            <div className="flex-1 min-w-0">
                               {editingPresetId === preset.id ? (
                                 <input
                                   autoFocus
@@ -982,8 +979,15 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                                 <span 
                                   className={`text-[9.5px] truncate w-full block leading-none font-medium ${
                                     isActive ? 'text-purple-700 font-semibold' : 'text-zinc-700'
-                                  }`}
-                                  title={isDevMode ? "Double-click to rename" : ""}
+                                  } ${isDevMode ? 'cursor-text hover:text-purple-600' : ''}`}
+                                  title={isDevMode ? (lang === 'en' ? "Click to rename" : "Кликните для переименования") : ""}
+                                  onClick={(e) => {
+                                    if (isDevMode && onUpdateReadyTemplates) {
+                                      e.stopPropagation();
+                                      setEditingPresetId(preset.id);
+                                      setEditingPresetName(lang === 'en' ? (preset.nameEn || preset.nameRu) : (preset.nameRu || preset.nameEn));
+                                    }
+                                  }}
                                 >
                                   {lang === 'en' ? (preset.nameEn || preset.nameRu) : (preset.nameRu || preset.nameEn)}
                                 </span>
@@ -1027,14 +1031,26 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                   <div className="text-[9.5px] uppercase tracking-wider font-mono font-bold text-zinc-400">
                     {lang === 'en' ? "My Templates" : "Мои шаблоны"}
                   </div>
-                  <button
-                    type="button"
-                    onClick={onSaveCurrentStyle}
-                    className="text-[9px] text-purple-600 hover:text-purple-800 font-bold flex items-center gap-0.5 transition-colors px-1.5 py-0.5 bg-purple-50 hover:bg-purple-100 rounded border border-purple-200 cursor-pointer"
-                    title={lang === 'en' ? 'Save Current Style as Template' : 'Сохранить стиль текущего проекта'}
-                  >
-                    + {lang === 'en' ? 'Save' : 'Создать'}
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {isDevMode && userTemplates.length > 0 && onTransferAllUserTemplatesToReady && (
+                      <button
+                        type="button"
+                        onClick={onTransferAllUserTemplatesToReady}
+                        className="text-[9px] text-amber-600 hover:text-amber-800 font-bold flex items-center gap-0.5 transition-colors px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 rounded border border-amber-200 cursor-pointer"
+                        title={lang === 'en' ? 'Transfer all user templates to permanent server-side database' : 'Перенести все в готовые шаблоны (сохранить в базу)'}
+                      >
+                        {lang === 'en' ? 'To Ready All' : 'Перенести все'}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={onSaveCurrentStyle}
+                      className="text-[9px] text-purple-600 hover:text-purple-800 font-bold flex items-center gap-0.5 transition-colors px-1.5 py-0.5 bg-purple-50 hover:bg-purple-100 rounded border border-purple-200 cursor-pointer"
+                      title={lang === 'en' ? 'Save Current Style as Template' : 'Сохранить стиль текущего проекта'}
+                    >
+                      + {lang === 'en' ? 'Save' : 'Создать'}
+                    </button>
+                  </div>
                 </div>
 
                 {userTemplates.length === 0 ? (
@@ -1060,22 +1076,28 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                             key={tpl.id}
                             role="button"
                             tabIndex={0}
-                            onClick={() => onApplyTemplate(tpl)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
+                            onClick={() => {
+                              if (editingUserTemplateId !== tpl.id) {
                                 onApplyTemplate(tpl);
                               }
                             }}
-                            className={`group relative flex flex-col items-center justify-between p-1 rounded-lg border text-center cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-purple-500 transition-colors duration-100 ${
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                if (editingUserTemplateId !== tpl.id) {
+                                  onApplyTemplate(tpl);
+                                }
+                              }
+                            }}
+                            className={`group relative flex flex-col items-center justify-between p-1 rounded-lg border text-center select-none outline-none focus-visible:ring-2 focus-visible:ring-purple-500 transition-colors duration-100 ${
                               isActive 
                                 ? 'border-purple-600 bg-purple-50/10 ring-1 ring-purple-400/50' 
                                 : 'border-zinc-200 hover:border-zinc-400 bg-zinc-50/40 hover:bg-zinc-50/80'
-                            }`}
+                            } ${editingUserTemplateId !== tpl.id ? 'cursor-pointer' : ''}`}
                             title={tpl.nameEn || tpl.nameRu}
                           >
                             {/* Square Aspect Mini Screen Preview */}
-                            <div className={`w-full aspect-square rounded-md bg-gradient-to-tr ${tpl.previewGradient || 'from-zinc-50 via-zinc-100 to-zinc-200'} relative overflow-hidden flex flex-col justify-between p-1 shadow-sm group-hover:scale-[1.03] transition-transform duration-100`}>
+                            <div className={`w-full aspect-square rounded-md bg-gradient-to-tr ${tpl.previewGradient || 'from-zinc-50 via-zinc-100 to-zinc-200'} relative overflow-hidden flex flex-col justify-between p-1 shadow-sm ${editingUserTemplateId !== tpl.id ? 'group-hover:scale-[1.03]' : ''} transition-transform duration-100`}>
                               
                               {/* Mini Notch */}
                               <div className="w-1/2 h-1 bg-black/60 rounded-full mx-auto mt-0.5" />
@@ -1102,20 +1124,96 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                                   e.preventDefault(); 
                                   onDeleteUserTemplate(tpl.id, e); 
                                 }}
-                                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-red-650 hover:bg-red-750 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] transition-all font-bold z-10 hover:scale-110"
+                                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-red-650 hover:bg-red-750 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] transition-all font-bold z-10 hover:scale-110 cursor-pointer"
                                 title={lang === 'en' ? 'Remove' : 'Удалить'}
                               >
                                 ✕
                               </button>
+
+                              {/* Transfer to ready templates button (Dev Mode) */}
+                              {isDevMode && onTransferUserTemplateToReady && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    onTransferUserTemplateToReady(tpl);
+                                  }}
+                                  className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 bg-emerald-600 hover:bg-emerald-750 text-white rounded-full w-4 h-4 flex items-center justify-center transition-all z-10 hover:scale-110 cursor-pointer"
+                                  title={lang === 'en' ? 'Save to server Ready Templates' : 'Сохранить навсегда в готовые шаблоны'}
+                                >
+                                  <span className="text-[9px] font-bold">↑</span>
+                                </button>
+                              )}
                             </div>
 
-                            {/* Name */}
-                            <span className="text-[9px] font-semibold text-zinc-800 truncate w-full mt-1.5 block">
-                              {(() => {
-                                const name = tpl.nameEn || tpl.nameRu;
-                                return name.length > 30 ? name.slice(0, 27) + '...' : name;
-                              })()}
-                            </span>
+                            {/* Name (with single click to rename in dev mode) */}
+                            <div className="w-full mt-1.5">
+                              {editingUserTemplateId === tpl.id ? (
+                                <input
+                                  autoFocus
+                                  className="w-full text-[9px] font-semibold text-center text-zinc-900 border border-purple-500 rounded px-0.5 py-0.5 outline-none bg-white"
+                                  value={editingUserTemplateName}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) => setEditingUserTemplateName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      if (editingUserTemplateName.trim() && onUpdateUserTemplates) {
+                                        const newTemplates = userTemplates.map(t => {
+                                          if (t.id === tpl.id) {
+                                            return {
+                                              ...t,
+                                              nameEn: editingUserTemplateName.trim(),
+                                              nameRu: editingUserTemplateName.trim(),
+                                            };
+                                          }
+                                          return t;
+                                        });
+                                        onUpdateUserTemplates(newTemplates);
+                                      }
+                                      setEditingUserTemplateId(null);
+                                    } else if (e.key === 'Escape') {
+                                      setEditingUserTemplateId(null);
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    if (editingUserTemplateName.trim() && onUpdateUserTemplates) {
+                                      const newTemplates = userTemplates.map(t => {
+                                        if (t.id === tpl.id) {
+                                          return {
+                                            ...t,
+                                            nameEn: editingUserTemplateName.trim(),
+                                            nameRu: editingUserTemplateName.trim(),
+                                          };
+                                        }
+                                        return t;
+                                      });
+                                      onUpdateUserTemplates(newTemplates);
+                                    }
+                                    setEditingUserTemplateId(null);
+                                  }}
+                                />
+                              ) : (
+                                <span 
+                                  className={`text-[9px] font-semibold text-zinc-800 truncate w-full block ${isDevMode ? 'cursor-text hover:text-purple-600' : ''}`}
+                                  title={isDevMode ? (lang === 'en' ? "Click to rename" : "Кликните для переименования") : ""}
+                                  onClick={(e) => {
+                                    if (isDevMode && onUpdateUserTemplates) {
+                                      e.stopPropagation();
+                                      setEditingUserTemplateId(tpl.id);
+                                      setEditingUserTemplateName(tpl.nameEn || tpl.nameRu);
+                                    }
+                                  }}
+                                >
+                                  {(() => {
+                                    const name = tpl.nameEn || tpl.nameRu;
+                                    return name.length > 30 ? name.slice(0, 27) + '...' : name;
+                                  })()}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -1129,18 +1227,24 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                             key={tpl.id}
                             role="button"
                             tabIndex={0}
-                            onClick={() => onApplyTemplate(tpl)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
+                            onClick={() => {
+                              if (editingUserTemplateId !== tpl.id) {
                                 onApplyTemplate(tpl);
                               }
                             }}
-                            className={`group relative flex items-center gap-1.5 p-1 px-1.5 rounded-md text-left cursor-pointer select-none outline-none focus-visible:ring-1 focus-visible:ring-purple-500 transition-colors duration-100 ${
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                if (editingUserTemplateId !== tpl.id) {
+                                  onApplyTemplate(tpl);
+                                }
+                              }
+                            }}
+                            className={`group relative flex items-center gap-1.5 p-1 px-1.5 rounded-md text-left select-none outline-none focus-visible:ring-1 focus-visible:ring-purple-500 transition-colors duration-100 ${
                               isActive 
                                 ? 'bg-purple-50/20 ring-1 ring-purple-400/30' 
                                 : 'hover:bg-zinc-100/50'
-                            }`}
+                            } ${editingUserTemplateId !== tpl.id ? 'cursor-pointer' : ''}`}
                             title={tpl.nameEn || tpl.nameRu}
                           >
                             {/* Tiny preview of gradient on left */}
@@ -1148,13 +1252,71 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
 
                             {/* Text on right */}
                             <div className="flex-1 min-w-0 flex items-center justify-between gap-1">
-                              <span 
-                                className={`text-[9.5px] truncate w-full block leading-none font-medium ${
-                                  isActive ? 'text-purple-700 font-semibold' : 'text-zinc-700'
-                                }`}
-                              >
-                                {lang === 'en' ? (tpl.nameEn || tpl.nameRu) : (tpl.nameRu || tpl.nameEn)}
-                              </span>
+                              <div className="flex-1 min-w-0">
+                                {editingUserTemplateId === tpl.id ? (
+                                  <input
+                                    autoFocus
+                                    className="w-full text-[9.5px] font-semibold text-zinc-900 border border-purple-500 rounded px-1 py-0.5 outline-none bg-white"
+                                    value={editingUserTemplateName}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => setEditingUserTemplateName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        if (editingUserTemplateName.trim() && onUpdateUserTemplates) {
+                                          const newTemplates = userTemplates.map(t => {
+                                            if (t.id === tpl.id) {
+                                              return {
+                                                ...t,
+                                                nameEn: editingUserTemplateName.trim(),
+                                                nameRu: editingUserTemplateName.trim(),
+                                              };
+                                            }
+                                            return t;
+                                          });
+                                          onUpdateUserTemplates(newTemplates);
+                                        }
+                                        setEditingUserTemplateId(null);
+                                      } else if (e.key === 'Escape') {
+                                        setEditingUserTemplateId(null);
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      if (editingUserTemplateName.trim() && onUpdateUserTemplates) {
+                                        const newTemplates = userTemplates.map(t => {
+                                          if (t.id === tpl.id) {
+                                            return {
+                                              ...t,
+                                              nameEn: editingUserTemplateName.trim(),
+                                              nameRu: editingUserTemplateName.trim(),
+                                            };
+                                          }
+                                          return t;
+                                        });
+                                        onUpdateUserTemplates(newTemplates);
+                                      }
+                                      setEditingUserTemplateId(null);
+                                    }}
+                                  />
+                                ) : (
+                                  <span 
+                                    className={`text-[9.5px] truncate w-full block leading-none font-medium ${
+                                      isActive ? 'text-purple-700 font-semibold' : 'text-zinc-700'
+                                    } ${isDevMode ? 'cursor-text hover:text-purple-600' : ''}`}
+                                    title={isDevMode ? (lang === 'en' ? "Click to rename" : "Кликните для переименования") : ""}
+                                    onClick={(e) => {
+                                      if (isDevMode && onUpdateUserTemplates) {
+                                        e.stopPropagation();
+                                        setEditingUserTemplateId(tpl.id);
+                                        setEditingUserTemplateName(tpl.nameEn || tpl.nameRu);
+                                      }
+                                    }}
+                                  >
+                                    {lang === 'en' ? (tpl.nameEn || tpl.nameRu) : (tpl.nameRu || tpl.nameEn)}
+                                  </span>
+                                )}
+                              </div>
 
                               {/* Action indicator or Checkmark or Delete button */}
                               <div className="flex items-center gap-0.5 shrink-0">
@@ -1164,6 +1326,21 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                                   </span>
                                 )}
                                 
+                                {isDevMode && onTransferUserTemplateToReady && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      onTransferUserTemplateToReady(tpl);
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white rounded px-1 py-0.5 transition-all border border-emerald-200 hover:border-emerald-600 cursor-pointer text-[8px] font-bold leading-none"
+                                    title={lang === 'en' ? 'Save to server Ready Templates' : 'Сохранить навсегда в готовые шаблоны'}
+                                  >
+                                    {lang === 'en' ? 'To Ready' : 'В готовые'}
+                                  </button>
+                                )}
+
                                 <button
                                   type="button"
                                   onClick={(e) => { 
