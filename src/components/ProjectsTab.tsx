@@ -13,7 +13,8 @@ import {
   Folder, 
   X, 
   ChevronRight, 
-  AlertCircle 
+  AlertCircle,
+  Pencil
 } from 'lucide-react';
 
 interface ProjectsTabProps {
@@ -71,10 +72,85 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
     setActiveProjectId, 
     createProject, 
     deleteProject, 
-    setActiveTab 
+    setActiveTab,
+    updateProject
   } = useDev();
 
   const { success: toastSuccess } = useToast();
+
+  // Quick Edit Modal states
+  const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [quickName, setQuickName] = useState('');
+  const [quickAvatar, setQuickAvatar] = useState('');
+  const [quickCompressing, setQuickCompressing] = useState(false);
+
+  // Expired Modal states
+  const [isExpiredModalOpen, setIsExpiredModalOpen] = useState(false);
+  const [expiredProjectName, setExpiredProjectName] = useState('');
+
+  const parseProjectDate = (dateStr: string): Date => {
+    if (!dateStr) return new Date();
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      return d;
+    }
+    const parts = dateStr.split('.');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      const parsed = new Date(year, month, day);
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+    return new Date();
+  };
+
+  const formatDate = (date: Date): string => {
+    const d = String(date.getDate()).padStart(2, '0');
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const y = date.getFullYear();
+    return `${d}.${m}.${y}`;
+  };
+
+  const handleOpenQuickEdit = (proj: MockProject) => {
+    setEditingProjectId(proj.id);
+    setQuickName(proj.name);
+    setQuickAvatar(proj.avatar || '');
+    setIsQuickEditOpen(true);
+  };
+
+  const handleSaveQuickEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickName.trim()) {
+      return;
+    }
+    if (editingProjectId) {
+      updateProject(editingProjectId, {
+        name: quickName.trim(),
+        avatar: quickAvatar || undefined
+      });
+      toastSuccess(lang === 'en' ? 'Project successfully updated' : 'Проект успешно обновлен');
+    }
+    setIsQuickEditOpen(false);
+    setEditingProjectId(null);
+  };
+
+  const handleQuickAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setQuickCompressing(true);
+    try {
+      const compressed = await compressAvatar(file);
+      setQuickAvatar(compressed);
+    } catch (err) {
+      console.error('Failed to compress avatar:', err);
+    } finally {
+      setQuickCompressing(false);
+    }
+  };
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
@@ -114,6 +190,18 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
   };
 
   const handleEditProject = (projId: string) => {
+    const proj = projects.find(p => p.id === projId);
+    if (proj) {
+      const createdDate = parseProjectDate(proj.createdAt);
+      const msInDay = 24 * 60 * 60 * 1000;
+      const diffDays = Math.floor((Date.now() - createdDate.getTime()) / msInDay);
+      const isExpired = diffDays > 395;
+      if (isExpired) {
+        setExpiredProjectName(proj.name);
+        setIsExpiredModalOpen(true);
+        return;
+      }
+    }
     setActiveProjectId(projId);
     setActiveTab('editor');
   };
@@ -169,6 +257,14 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
 
         {/* Existing Projects */}
         {projects.map((project) => {
+          const createdDate = parseProjectDate(project.createdAt);
+          const msInDay = 24 * 60 * 60 * 1000;
+          const diffDays = Math.floor((Date.now() - createdDate.getTime()) / msInDay);
+          const activeUntilDate = new Date(createdDate.getTime() + 365 * msInDay);
+          const graceUntilDate = new Date(createdDate.getTime() + 395 * msInDay);
+          const isExpired = diffDays > 395;
+          const isGrace = diffDays > 365 && diffDays <= 395;
+
           return (
             <div 
               key={project.id}
@@ -180,29 +276,45 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 ${
-                      project.type === 'personal_card' 
-                        ? 'bg-blue-500/5 border-blue-500/10 text-blue-400' 
-                        : project.type === 'menu' 
-                        ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-400'
-                        : 'bg-purple-500/5 border-purple-500/10 text-purple-400'
-                    }`}>
-                      {project.type === 'personal_card' && <User className="w-4.5 h-4.5 stroke-[1.5]" />}
-                      {project.type === 'menu' && <UtensilsCrossed className="w-4.5 h-4.5 stroke-[1.5]" />}
-                      {project.type === 'catalog' && <Layers className="w-4.5 h-4.5 stroke-[1.5]" />}
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 overflow-hidden bg-zinc-950 border-zinc-850">
+                      {project.avatar ? (
+                        <img src={project.avatar} className="w-full h-full object-cover" alt={project.name} />
+                      ) : (
+                        <div className={`w-full h-full flex items-center justify-center ${
+                          project.type === 'personal_card' 
+                            ? 'bg-blue-500/5 text-blue-400' 
+                            : project.type === 'menu' 
+                            ? 'bg-emerald-500/5 text-emerald-400'
+                            : 'bg-purple-500/5 text-purple-400'
+                        }`}>
+                          {project.type === 'personal_card' && <User className="w-4.5 h-4.5 stroke-[1.5]" />}
+                          {project.type === 'menu' && <UtensilsCrossed className="w-4.5 h-4.5 stroke-[1.5]" />}
+                          {project.type === 'catalog' && <Layers className="w-4.5 h-4.5 stroke-[1.5]" />}
+                        </div>
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <h3 className="font-bold text-zinc-200 group-hover:text-white transition-colors truncate text-base" title={project.name}>
                         {project.name}
                       </h3>
                       <p className="text-[10px] text-zinc-500 mt-0.5 font-mono">
-                        {lang === 'en' ? 'Created:' : 'Создан:'} {project.createdAt}
+                        {lang === 'en' ? 'Created:' : 'Создан:'} {formatDate(createdDate)}
                       </p>
                     </div>
                   </div>
 
                   {/* Refined Small action buttons (quieter opacity, fully distinct hover) */}
                   <div className="flex items-center gap-1 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity duration-300">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenQuickEdit(project);
+                      }}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-indigo-400 hover:bg-indigo-500/10 border border-transparent hover:border-zinc-800 transition-all"
+                      title={lang === 'en' ? 'Quick Edit' : 'Быстрое редактирование'}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -230,7 +342,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
 
               {/* Bottom Row: Status Badges & Navigation Action */}
               <div className="flex items-end justify-between border-t border-zinc-900/50 pt-4">
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
                   {/* Type Badge */}
                   <span className={`text-[9px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md border ${
                     project.type === 'personal_card'
@@ -256,6 +368,21 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
                   ) : (
                     <span className="text-[9px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md border bg-zinc-900/40 text-zinc-500 border-zinc-850">
                       {lang === 'en' ? 'Standard' : 'Стандарт'}
+                    </span>
+                  )}
+
+                  {/* Expiration status badges */}
+                  {isExpired ? (
+                    <span className="text-[9px] font-bold px-2 py-1 rounded-md border bg-rose-950/25 text-rose-400 border-rose-500/20">
+                      🛑 {lang === 'en' ? 'Expired' : 'Истек'}
+                    </span>
+                  ) : isGrace ? (
+                    <span className="text-[9px] font-bold px-2 py-1 rounded-md border bg-amber-950/20 text-amber-400 border-amber-500/20 animate-pulse">
+                      ⏳ {lang === 'en' ? 'Renewal: ' : 'Продление: '}{formatDate(graceUntilDate)}
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-semibold px-2 py-1 rounded-md border bg-zinc-900/10 text-zinc-400 border-zinc-850">
+                      {lang === 'en' ? 'Active: ' : 'Активен до: '}{formatDate(activeUntilDate)}
                     </span>
                   )}
                 </div>
@@ -715,6 +842,164 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
                   {lang === 'en' ? 'Delete' : 'Удалить'}
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Subscription Expired Modal */}
+      <AnimatePresence>
+        {isExpiredModalOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsExpiredModalOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              className="relative bg-zinc-950 border border-zinc-850 rounded-2xl p-6 shadow-2xl max-w-sm w-full text-center"
+            >
+              <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto mb-4 border border-rose-500/20">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2 tracking-tight">
+                {lang === 'en' ? 'Subscription Expired' : 'Срок действия истек'}
+              </h3>
+              <p className="text-sm text-zinc-400 mb-6 leading-relaxed">
+                {lang === 'en' 
+                  ? `The project "${expiredProjectName}" has expired. Please renew your subscription to continue.` 
+                  : `Срок действия проекта "${expiredProjectName}" истек. Пожалуйста, продлите подписку для продолжения работы.`}
+              </p>
+              <button
+                onClick={() => setIsExpiredModalOpen(false)}
+                className="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs uppercase tracking-wider font-bold transition-all shadow-lg shadow-indigo-600/20"
+              >
+                {lang === 'en' ? 'Close' : 'Закрыть'}
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Quick Edit Modal */}
+      <AnimatePresence>
+        {isQuickEditOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setIsQuickEditOpen(false);
+                setEditingProjectId(null);
+              }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              className="relative bg-zinc-950 border border-zinc-850 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+            >
+              <div className="p-5 border-b border-zinc-850 flex items-center justify-between">
+                <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                  <Pencil className="w-4 h-4 text-indigo-400" />
+                  {lang === 'en' ? 'Edit Project Details' : 'Быстрое редактирование'}
+                </h3>
+                <button
+                  onClick={() => {
+                    setIsQuickEditOpen(false);
+                    setEditingProjectId(null);
+                  }}
+                  className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveQuickEdit} className="p-6 space-y-5">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    {lang === 'en' ? 'Project Name' : 'Название проекта'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={quickName}
+                    onChange={(e) => setQuickName(e.target.value)}
+                    placeholder={lang === 'en' ? 'Project Name' : 'Имя проекта'}
+                    className="w-full bg-zinc-900 border border-zinc-800 focus:border-indigo-500 text-sm text-white rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    {lang === 'en' ? 'Avatar / Brand Logo' : 'Аватар / Логотип бренда'}
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-16 h-16 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden shrink-0">
+                      {quickAvatar ? (
+                        <img src={quickAvatar} className="w-full h-full object-cover" alt="Avatar preview" />
+                      ) : (
+                        <User className="w-6 h-6 text-zinc-650" />
+                      )}
+                      {quickCompressing && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                          <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 space-y-1">
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 text-xs text-zinc-350 hover:text-white cursor-pointer transition-colors">
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>{lang === 'en' ? 'Upload Image' : 'Загрузить картинку'}</span>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={handleQuickAvatarChange}
+                        />
+                      </label>
+                      <p className="text-[10px] text-zinc-500 leading-normal">
+                        {lang === 'en' 
+                          ? 'JPG, PNG, WebP. High-res images are automatically compressed.' 
+                          : 'JPG, PNG, WebP. Большие картинки автоматически сжимаются.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-zinc-850 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsQuickEditOpen(false);
+                      setEditingProjectId(null);
+                    }}
+                    className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-lg text-xs font-bold border border-zinc-800 transition-colors"
+                  >
+                    {lang === 'en' ? 'Cancel' : 'Отмена'}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!quickName.trim() || quickCompressing}
+                    className={`px-5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-lg cursor-pointer ${
+                      quickName.trim() && !quickCompressing
+                        ? 'bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-500 shadow-indigo-600/15'
+                        : 'bg-zinc-800 text-zinc-500 border border-zinc-750 cursor-not-allowed'
+                    }`}
+                  >
+                    {lang === 'en' ? 'Save Changes' : 'Сохранить'}
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

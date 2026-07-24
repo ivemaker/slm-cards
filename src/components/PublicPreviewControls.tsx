@@ -151,7 +151,7 @@ export const PublicPreviewControls: React.FC<PublicPreviewControlsProps> = ({
 
   const settingsMenuItems = [
     {
-      id: 'back',
+      id: 'bg',
       icon: ImageIcon,
       label: lang === 'en' ? 'Background' : 'Фон',
       action: onToggleBack,

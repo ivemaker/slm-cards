@@ -35,28 +35,96 @@ export const DevPanel: React.FC = () => {
   };
 
   const handleFinishPremium = () => {
-    if (activeProjectId) {
-      updateProject(activeProjectId, {
-        plan: 'basic',
-        tariff: 'Basic',
-        premiumExpiredAt: new Date().toISOString()
+    if (projects.length > 0) {
+      projects.forEach(p => {
+        updateProject(p.id, {
+          plan: 'basic',
+          tariff: 'Basic',
+          premiumExpiredAt: new Date().toISOString()
+        });
       });
-      toastInfo?.('Начался 7-дневный льготный период (Grace Period)');
+      toastInfo?.('Льготный период 7 дней начался для всех проектов.');
     } else {
-      toastError('Нет активного проекта');
+      toastError('Нет доступных проектов');
     }
   };
 
   const handleFastForward8Days = () => {
-    if (activeProjectId) {
+    if (projects.length > 0) {
       const pastDate = new Date();
       pastDate.setDate(pastDate.getDate() - 8);
-      updateProject(activeProjectId, {
-        premiumExpiredAt: pastDate.toISOString()
+      projects.forEach(p => {
+        updateProject(p.id, {
+          premiumExpiredAt: pastDate.toISOString()
+        });
       });
-      toastSuccess('Перемотано на 8 дней вперед. Ожидайте отключения.');
+      toastSuccess('Все проекты перемотаны на 8 дней вперед.');
     } else {
-      toastError('Нет активного проекта');
+      toastError('Нет доступных проектов');
+    }
+  };
+
+  const handleSimulationActive = () => {
+    if (projects.length > 0) {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 300); // subtract 300 days
+      projects.forEach(p => {
+        updateProject(p.id, {
+          createdAt: pastDate.toISOString(),
+          premiumExpiredAt: undefined
+        });
+      });
+      toastSuccess('Симуляция активного периода: прошло 10 месяцев для всех проектов.');
+    } else {
+      toastError('Нет доступных проектов');
+    }
+  };
+
+  const handleSimulationGrace = () => {
+    if (projects.length > 0) {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 375); // subtract 375 days
+      const expiredDate = new Date(pastDate.getTime() + 365 * 24 * 60 * 60 * 1000); // exactly 365 days after creation
+      projects.forEach(p => {
+        updateProject(p.id, {
+          createdAt: pastDate.toISOString(),
+          premiumExpiredAt: expiredDate.toISOString()
+        });
+      });
+      toastSuccess('Симуляция льготного периода: прошло 12.5 месяцев для всех проектов.');
+    } else {
+      toastError('Нет доступных проектов');
+    }
+  };
+
+  const handleSimulationExpired = () => {
+    if (projects.length > 0) {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 420); // subtract 420 days
+      const expiredDate = new Date(pastDate.getTime() + 365 * 24 * 60 * 60 * 1000); // exactly 365 days after creation
+      projects.forEach(p => {
+        updateProject(p.id, {
+          createdAt: pastDate.toISOString(),
+          premiumExpiredAt: expiredDate.toISOString()
+        });
+      });
+      toastSuccess('Симуляция блокировки: прошло 14 месяцев для всех проектов.');
+    } else {
+      toastError('Нет доступных проектов');
+    }
+  };
+
+  const handleResetTime = () => {
+    if (projects.length > 0) {
+      projects.forEach(p => {
+        updateProject(p.id, {
+          createdAt: new Date().toISOString(),
+          premiumExpiredAt: undefined
+        });
+      });
+      toastSuccess('Время всех проектов успешно сброшено на текущее!');
+    } else {
+      toastError('Нет доступных проектов');
     }
   };
 
@@ -254,6 +322,38 @@ export const DevPanel: React.FC = () => {
                 className="w-full py-1.5 px-2 bg-rose-900/30 hover:bg-rose-800/40 text-rose-400 rounded-lg text-[11px] font-medium border border-rose-800/50 transition-all cursor-pointer text-left"
               >
                 ⏩ Перемотать на 8 дней вперед
+              </button>
+              <button
+                type="button"
+                onClick={handleSimulationActive}
+                className="w-full py-1.5 px-2 bg-emerald-900/30 hover:bg-emerald-800/40 text-emerald-400 rounded-lg text-[11px] font-medium border border-emerald-800/50 transition-all cursor-pointer text-left"
+                id="dev-btn-sim-active"
+              >
+                🟢 Прошло 10 месяцев (Активен)
+              </button>
+              <button
+                type="button"
+                onClick={handleSimulationGrace}
+                className="w-full py-1.5 px-2 bg-amber-900/30 hover:bg-amber-800/40 text-amber-400 rounded-lg text-[11px] font-medium border border-amber-800/50 transition-all cursor-pointer text-left"
+                id="dev-btn-sim-grace"
+              >
+                🟡 Прошло 12.5 месяцев (Льготный период)
+              </button>
+              <button
+                type="button"
+                onClick={handleSimulationExpired}
+                className="w-full py-1.5 px-2 bg-rose-900/30 hover:bg-rose-800/40 text-rose-400 rounded-lg text-[11px] font-medium border border-rose-800/50 transition-all cursor-pointer text-left"
+                id="dev-btn-sim-expired"
+              >
+                🔴 Прошло 14 месяцев (Подписка истекла)
+              </button>
+              <button
+                type="button"
+                onClick={handleResetTime}
+                className="w-full py-1.5 px-2 bg-blue-900/30 hover:bg-blue-800/40 text-blue-400 rounded-lg text-[11px] font-medium border border-blue-800/50 transition-all cursor-pointer text-left"
+                id="dev-btn-reset-time"
+              >
+                🔄 Сбросить время на текущее
               </button>
             </div>
              <div className="space-y-2 mb-4">

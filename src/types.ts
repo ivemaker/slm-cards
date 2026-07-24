@@ -11,6 +11,7 @@ export type FrameRadius = 'none' | 'sm' | 'md' | 'lg' | 'full';
 export interface SocialLink {
   platform: 'instagram' | 'twitter' | 'github' | 'linkedin' | 'email' | 'phone' | 'whatsapp' | 'telegram' | 'website';
   url: string;
+  label?: string;
 }
 
 export interface SocialsIconStyle {
@@ -47,6 +48,7 @@ export interface SocialsIconStyle {
 }
 
 export interface ProfileContent {
+  subtitle?: string;
   avatar: string;
   name: string;
   bio: string;
@@ -271,6 +273,10 @@ export interface Block {
   customTitleFontSize?: number;
   customDescFont?: string;
   customDescFontSize?: number;
+  customSubtitleFont?: string;
+  customSubtitleColor?: string;
+  customSubtitleFontSize?: number;
+  subtitleTextStyles?: TextStyles;
   customIconColor?: string;
   
   titleTextStyles?: TextStyles;
@@ -307,7 +313,7 @@ export interface Block {
   socialsContent?: { 
     links: SocialLink[];
     contactName?: string;
-    phones?: { number: string; isPrimary: boolean }[];
+    phones?: { number: string; isPrimary: boolean; label?: string; isVisible?: boolean }[];
     iconSize?: number;
     maxPerRow?: number;
     iconSpacing?: 'small' | 'medium' | 'large';

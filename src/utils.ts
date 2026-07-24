@@ -39,8 +39,17 @@ export function compressImage(file: File, maxW = 400, maxH = 400): Promise<strin
         }
 
         ctx.drawImage(img, 0, 0, width, height);
-        // Export as compressed JPG
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        // Export as transparent format if PNG/WebP/GIF, otherwise compressed JPG
+        const isTransparentType = file.type === 'image/png' || file.type === 'image/webp' || file.type === 'image/gif';
+        const exportType = isTransparentType ? file.type : 'image/jpeg';
+        let dataUrl: string;
+        if (exportType === 'image/png') {
+          dataUrl = canvas.toDataURL('image/png');
+        } else if (exportType === 'image/webp') {
+          dataUrl = canvas.toDataURL('image/webp', 0.82);
+        } else {
+          dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        }
         resolve(dataUrl);
       };
       img.onerror = (err) => reject(err);

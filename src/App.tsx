@@ -63,6 +63,9 @@ import {
   Sun,
   Moon,
   ShoppingCart,
+  MapPin,
+  Navigation,
+  ExternalLink,
   Coffee,
   Utensils,
   Scissors,
@@ -105,6 +108,7 @@ import { DashboardTab } from './components/DashboardTab';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDev } from './context/DevContext';
 import { SettingsTab } from './components/SettingsTab';
+import { ProfileDashboard } from './components/ProfileDashboard';
 import { useToast } from './context/ToastContext';
 import { AuthModal } from './components/AuthModal';
 import RainOfArthurPage from './rain_effect/RainOfArthurPage';
@@ -439,7 +443,11 @@ const splitThemeUpdates = (base: any, dark: any, updates: any, theme: 'light' | 
 
   Object.keys(updates).forEach(key => {
     const val = updates[key];
-    if (val === undefined) return;
+    if (val === undefined) {
+      delete nBase[key];
+      delete nDark[key];
+      return;
+    }
 
     if (isThemeSpecificProperty(key)) {
       if (theme === 'dark') {
@@ -477,6 +485,8 @@ const splitThemeUpdates = (base: any, dark: any, updates: any, theme: 'light' | 
       nBase[key] = nb;
       if (Object.keys(nd).length > 0) {
         nDark[key] = nd;
+      } else {
+        delete nDark[key];
       }
     } else {
       nBase[key] = val;
@@ -769,7 +779,13 @@ export default function App() {
     previewScope,
     startPreview,
     cancelPreview,
-    applyPreviewTemplate
+    applyPreviewTemplate,
+    userEmail,
+    userBalance,
+    isBalanceHidden,
+    toggleBalanceVisibility,
+    topUpBalance,
+    updateCredentials
   } = useDev();
   const activeProjectForPremiumCheck = projects.find(p => p.id === activeProjectId);
   const isPremium = activeProjectForPremiumCheck ? (activeProjectForPremiumCheck.tariff === 'Premium') : (planType === 'premium');
@@ -953,6 +969,18 @@ export default function App() {
   const [lang, setLang] = useState<'en' | 'ru'>('en');
   const [isBurgerMenuOpen, setIsBurgerMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   
   // Project Creation Modal State
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -971,6 +999,59 @@ export default function App() {
   
   // Complete configurations for each of the three template routes, loaded or defaulted
   const [configs, setConfigs] = useState<Record<'business' | 'restaurant' | 'catalog', ProjectConfig>>(DEFAULT_CONFIGS);
+
+  // Synchronize active project's name and avatar into the active in-memory configuration's profile block (Editor to Card sync)
+  useEffect(() => {
+    if (activeProjectId) {
+      const activeProject = projects.find(p => p.id === activeProjectId);
+      if (activeProject) {
+        let targetType: 'business' | 'restaurant' | 'catalog' = 'business';
+        if (activeProject.type === 'menu') targetType = 'restaurant';
+        if (activeProject.type === 'catalog') targetType = 'catalog';
+
+        const currentConfig = configs[targetType];
+        if (currentConfig && currentConfig.blocks) {
+          const profileBlockIndex = currentConfig.blocks.findIndex(b => b.type === 'profile');
+          if (profileBlockIndex !== -1) {
+            const profileBlock = currentConfig.blocks[profileBlockIndex];
+            const pContent = profileBlock.profileContent || {};
+            const needsNameUpdate = Boolean(activeProject.name && pContent.name !== activeProject.name);
+            const needsAvatarUpdate = Boolean(activeProject.avatar && pContent.avatar !== activeProject.avatar);
+
+            if (needsNameUpdate || needsAvatarUpdate) {
+              const updatedBlocks = currentConfig.blocks.map((b, idx) => {
+                if (idx === profileBlockIndex) {
+                  return {
+                    ...b,
+                    profileContent: {
+                      ...pContent,
+                      ...(needsNameUpdate ? { name: activeProject.name } : {}),
+                      ...(needsAvatarUpdate ? { avatar: activeProject.avatar } : {})
+                    }
+                  };
+                }
+                return b;
+              });
+
+              setConfigs(prev => {
+                const updated = {
+                  ...prev,
+                  [targetType]: {
+                    ...prev[targetType],
+                    blocks: updatedBlocks
+                  }
+                };
+                const key = `nocode_cfg_project_${activeProjectId}`;
+                localStorage.setItem(key, JSON.stringify(updated[targetType]));
+                set(key, updated[targetType]).catch(err => console.error("IDB save error in sync useEffect", err));
+                return updated;
+              });
+            }
+          }
+        }
+      }
+    }
+  }, [projects, activeProjectId, configs, templateType]);
 
   const [customReadyTemplates, setCustomReadyTemplates] = useState<any[]>([]);
   const [userTemplates, setUserTemplates] = useState<any[]>([]);
@@ -1200,7 +1281,9 @@ export default function App() {
   // Controls visibility of sliding layers list, settings popup, and nested inserter
   const [showLayersPanel, setShowLayersPanel] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
-  const [activePhoneModal, setActivePhoneModal] = useState<{ contactName?: string; phones: { number: string; isPrimary: boolean }[] } | null>(null);
+  const [activePhoneModal, setActivePhoneModal] = useState<{ contactName?: string; phones: { number: string; isPrimary: boolean; label?: string }[] } | null>(null);
+  const [activeMapModal, setActiveMapModal] = useState<{ address: string } | null>(null);
+  const [activeSocialModal, setActiveSocialModal] = useState<{ platform: string; links: { url: string; label?: string }[] } | null>(null);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
 
   // DESIGN_PRESETS relocated to top-level module scope to avoid Temporal Dead Zone (TDZ)
@@ -1295,9 +1378,24 @@ export default function App() {
     }
   }, [activeTab]);
 
+  const allReadyTemplates = filterUniqueTemplates([
+    ...customReadyTemplates,
+    ...DESIGN_PRESETS.map(p => ({
+      id: p.id,
+      name: lang === 'en' ? p.nameEn : p.nameRu,
+      nameEn: p.nameEn,
+      nameRu: p.nameRu,
+      config: p.config
+    }))
+  ]);
+
   const publicThemes = [
     { id: 'original', name: lang === 'en' ? 'My Design' : 'Мой дизайн', config: originalConfigAtPreviewStart },
-    ...DESIGN_PRESETS.map(t => ({ id: t.id, name: lang === 'en' ? t.nameEn : t.nameRu, config: t.config }))
+    ...allReadyTemplates.map(t => ({
+      id: t.id,
+      name: lang === 'en' ? (t.nameEn || t.name || 'Template') : (t.nameRu || t.name || t.nameEn || 'Шаблон'),
+      config: t.config
+    }))
   ];
 
   const handleNextTheme = () => {
@@ -1530,18 +1628,73 @@ export default function App() {
       }
 
       if (shouldApplyBlocks) {
-        if (newConfig.blocks) {
+        if (newConfig.theme) current.theme = newConfig.theme;
+        if (newConfig.blockDefaults) {
+          current.blockDefaults = { ...(current.blockDefaults || {}), ...newConfig.blockDefaults };
+        }
+
+        if (previewScope === 'all' && newConfig.blocks && newConfig.blocks.length > 0) {
           current.blocks = newConfig.blocks;
-        } else if (newConfig.blockDefaults) {
-          // Apply block defaults to all blocks
+        } else {
+          // Apply block defaults + type-specific styling onto current blocks
+          const blockDefaults = newConfig.blockDefaults || {};
+          let blockTypeDefaults = newConfig.blockTypeDefaults || {};
+
+          if (Object.keys(blockTypeDefaults).length === 0 && newConfig.blocks) {
+            const collected: Record<string, any> = {};
+            newConfig.blocks.forEach((b: any) => {
+              if (b && b.type && !collected[b.type]) {
+                const styleObj: any = {};
+                STYLE_KEYS.forEach(key => {
+                  if (b[key] !== undefined) styleObj[key] = b[key];
+                });
+                if (b.type === 'socials' && b.socialsContent) {
+                  styleObj.socialsContentStyle = {
+                    iconSize: b.socialsContent.iconSize,
+                    maxPerRow: b.socialsContent.maxPerRow,
+                    iconSpacing: b.socialsContent.iconSpacing,
+                    layout: b.socialsContent.layout,
+                    iconStyle: b.socialsContent.iconStyle ? JSON.parse(JSON.stringify(b.socialsContent.iconStyle)) : undefined
+                  };
+                }
+                if (b.type === 'profile' && b.profileContent) {
+                  styleObj.profileContentStyle = {
+                    avatarShape: b.profileContent.avatarShape,
+                    avatarSize: b.profileContent.avatarSize,
+                    layout: b.profileContent.layout,
+                    align: b.profileContent.align,
+                    fullWidth: b.profileContent.fullWidth,
+                    showAvatar: b.profileContent.showAvatar,
+                    bgImage: b.profileContent.bgImage,
+                    avatarBorderEnabled: b.profileContent.avatarBorderEnabled,
+                    avatarBorderWidth: b.profileContent.avatarBorderWidth,
+                    avatarBorderStyle: b.profileContent.avatarBorderStyle,
+                    avatarBorderColor: b.profileContent.avatarBorderColor
+                  };
+                }
+                collected[b.type] = styleObj;
+              }
+            });
+            blockTypeDefaults = collected;
+          }
+
           current.blocks = current.blocks.map((b: any) => {
-            const updated = { ...b, ...newConfig.blockDefaults };
-            // If the template has a specific theme (modern/mono/serif), apply it too
+            let updated = { ...b, ...blockDefaults };
             if (newConfig.theme) updated.theme = newConfig.theme;
+
+            const typeDefaults = blockTypeDefaults[b.type];
+            if (typeDefaults) {
+              updated = { ...updated, ...typeDefaults };
+              if (b.type === 'profile' && b.profileContent && typeDefaults.profileContentStyle) {
+                updated.profileContent = { ...b.profileContent, ...typeDefaults.profileContentStyle };
+              }
+              if (b.type === 'socials' && b.socialsContent && typeDefaults.socialsContentStyle) {
+                updated.socialsContent = { ...b.socialsContent, ...typeDefaults.socialsContentStyle };
+              }
+            }
             return updated;
           });
         }
-        if (newConfig.theme) current.theme = newConfig.theme;
       }
 
       return {
@@ -2673,13 +2826,19 @@ export default function App() {
       const updatedBlocks = config.blocks.map(b => {
         if (b.id === blockId) {
           if (itemType === 'profile' && b.profileContent) {
+            const updatedProfileContent: any = { 
+              ...b.profileContent, 
+              avatar: finalAvatarUrl
+            };
+            if (rawSvgText) {
+              updatedProfileContent.avatarSvgRaw = rawSvgText;
+            } else {
+              delete updatedProfileContent.avatarSvgRaw;
+              updatedProfileContent.avatarSvgRaw = undefined;
+            }
             return {
               ...b,
-              profileContent: { 
-                ...b.profileContent, 
-                avatar: finalAvatarUrl,
-                avatarSvgRaw: rawSvgText || undefined
-              }
+              profileContent: updatedProfileContent
             };
           } else if (itemType === 'catalog') {
             return {
@@ -3633,47 +3792,200 @@ export default function App() {
     showToast(lang === 'en' ? `Added ${item.title} to Cart` : `${item.title} добавлен в корзину`);
   };
 
-  const downloadVCard = () => {
+  const downloadVCard = (specificPhones?: { number: string; isPrimary: boolean; label?: string }[], specificLabel?: string) => {
     if (!activePhoneModal) return;
     const { contactName, phones } = activePhoneModal;
+    const projContacts = activeProject?.contacts;
     
-    // Find primary or use the first one
-    const primaryPhone = phones.find(p => p.isPrimary) || phones[0];
-    const otherPhones = phones.filter(p => p !== primaryPhone);
+    const allPhones = phones && phones.length > 0 ? phones : (projContacts?.phones || []);
+    const primaryPhone = allPhones.find(p => p.isPrimary && p.isVisible !== false) || allPhones.find(p => p.isPrimary) || allPhones[0];
+    const primaryLabel = primaryPhone?.label?.trim() || '';
+    const isMainVcf = !specificLabel?.trim() || specificLabel.trim() === primaryLabel;
+    
+    let labelSuffix = specificLabel?.trim() ? ` (${specificLabel.trim()})` : '';
+    const baseProjectName = activeProject?.name || contactName || 'Contact';
+    const projectName = `${baseProjectName}${labelSuffix}`;
+    const filename = `${projectName.replace(/[^a-z0-9а-яё]/gi, '_')}.vcf`;
 
-    let vcard = `BEGIN:VCARD\r\nVERSION:3.0\r\nFN;CHARSET=UTF-8:${contactName || 'Contact'}\r\n`;
-    if (primaryPhone && primaryPhone.number) {
-      vcard += `TEL;TYPE=CELL,PREF:${primaryPhone.number}\r\n`;
+    const profileBlock = config?.blocks?.find((b: any) => b.type === 'profile') || (activeProject as any)?.blocks?.find((b: any) => b.type === 'profile');
+    const profileSubtitle = profileBlock?.profileContent?.subtitle || '';
+    const profileBio = profileBlock?.profileContent?.bio || '';
+    const noteText = profileBio || activeProject?.description || '';
+    const titleText = profileSubtitle || (noteText ? noteText.slice(0, 50) : "Контакты");
+
+    const vcardLines: string[] = [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      `FN;CHARSET=UTF-8:${projectName}`,
+      `N;CHARSET=UTF-8:${projectName}`,
+      `TITLE;CHARSET=UTF-8:${titleText}`
+    ];
+
+    // Note (description/bio)
+    if (noteText) {
+      vcardLines.push("NOTE;CHARSET=UTF-8:" + noteText.replace(/\n/g, '\\n'));
     }
-    otherPhones.forEach((p, idx) => {
+
+    // Photo (avatar)
+    if (activeProject?.avatar && activeProject.avatar.includes('base64,')) {
+      const rawBase64 = activeProject.avatar.split(',')[1];
+      if (rawBase64) {
+        vcardLines.push("PHOTO;TYPE=JPEG;ENCODING=b:" + rawBase64);
+      }
+    }
+
+    // Phones
+    const phonesList = specificPhones && specificPhones.length > 0 
+      ? specificPhones 
+      : (phones && phones.length > 0 ? phones : (projContacts?.phones || []));
+      
+    phonesList.forEach((p) => {
       if (p.number) {
-        vcard += `TEL;TYPE=CELL:${p.number}\r\n`;
+        const cleanNumber = p.number.replace(/[^\d+]/g, '');
+        vcardLines.push("TEL:" + cleanNumber);
       }
     });
-    vcard += 'END:VCARD\r\n';
 
-    const blob = new Blob([vcard], { type: 'text/vcard;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    // By omitting the 'download' attribute, iOS Safari opens the contact card natively
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-    }, 500);
+    if (isMainVcf) {
+      // Email
+      const socials = projContacts?.socials || [];
+      const emailSocial = socials.find(s => s.type === 'email');
+    if (emailSocial && emailSocial.url) {
+      const emailValue = emailSocial.url.replace(/^mailto:/i, '').trim();
+      if (emailValue) {
+        vcardLines.push("EMAIL;TYPE=INTERNET:" + emailValue);
+      }
+    }
+
+    // Socials & URLs
+    const knownSocialTypes = ['telegram', 'instagram', 'vk', 'whatsapp', 'facebook', 'twitter', 'tiktok', 'linkedin'];
+    socials.forEach(social => {
+      if (!social.url || social.type === 'email') return;
+      const typeLower = social.type.toLowerCase();
+      let urlValue = social.url.trim();
+
+      if (typeLower === 'telegram') {
+        let tgNick = urlValue;
+        if (tgNick.includes('t.me/')) {
+          tgNick = tgNick.split('t.me/')[1];
+        }
+        tgNick = tgNick.replace(/^@/, '').trim();
+        tgNick = tgNick.split('?')[0].replace(/\/+$/, '');
+        
+        vcardLines.push("URL;TYPE=TELEGRAM:https://t.me/" + tgNick);
+        vcardLines.push("X-SOCIALPROFILE;type=telegram:https://t.me/" + tgNick);
+      } else if (typeLower === 'instagram') {
+        let instaNick = urlValue;
+        if (instaNick.includes('instagram.com/')) {
+          instaNick = instaNick.split('instagram.com/')[1];
+        }
+        instaNick = instaNick.replace(/^@/, '').trim();
+        instaNick = instaNick.split('?')[0].replace(/\/+$/, '');
+        
+        vcardLines.push("URL;TYPE=INSTAGRAM:https://instagram.com/" + instaNick);
+        vcardLines.push("X-SOCIALPROFILE;type=instagram:https://instagram.com/" + instaNick);
+      } else if (typeLower === 'whatsapp') {
+        let waPhone = urlValue;
+        if (waPhone.includes('wa.me/')) {
+          waPhone = waPhone.split('wa.me/')[1];
+        } else if (waPhone.includes('api.whatsapp.com/send')) {
+          const match = waPhone.match(/[?&]phone=([^&]+)/);
+          if (match && match[1]) {
+            waPhone = match[1];
+          }
+        }
+        waPhone = waPhone.replace(/[^\d+]/g, '');
+        
+        vcardLines.push("URL;TYPE=WHATSAPP:https://wa.me/" + waPhone);
+        vcardLines.push("X-SOCIALPROFILE;type=whatsapp:https://wa.me/" + waPhone);
+      } else if (typeLower === 'vk') {
+        let vkNick = urlValue;
+        if (vkNick.includes('vk.com/')) {
+          vkNick = vkNick.split('vk.com/')[1];
+        }
+        vkNick = vkNick.split('?')[0].replace(/\/+$/, '');
+        
+        vcardLines.push("URL;TYPE=VK:https://vk.com/" + vkNick);
+        vcardLines.push("X-SOCIALPROFILE;type=vk:https://vk.com/" + vkNick);
+      } else {
+        vcardLines.push("URL;TYPE=" + social.type.toUpperCase() + ":" + urlValue);
+        if (knownSocialTypes.includes(typeLower)) {
+          vcardLines.push("X-SOCIALPROFILE;type=" + typeLower + ":" + urlValue);
+        }
+      }
+    });
+
+    if (projContacts?.address) {
+      vcardLines.push("URL;TYPE=LOCATION:https://yandex.ru/maps/?rtext=~" + encodeURIComponent(projContacts.address));
+      vcardLines.push(`ADR;TYPE=WORK;CHARSET=UTF-8:;;${projContacts.address};;;;`);
+    }
+
+    if (projContacts?.mapLinks) {
+      projContacts.mapLinks.forEach(link => {
+        if (link.url && link.url.trim() !== '') {
+          const rawLabel = link.label || 'Location';
+          const cleanLabel = rawLabel.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+          vcardLines.push(`URL;TYPE=${cleanLabel}:${link.url}`);
+        }
+      });
+    }
+    }
+
+    vcardLines.push('END:VCARD');
+
+    const vcardText = vcardLines.join('\r\n');
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      window.location.href = "data:text/vcard;charset=utf-8," + encodeURIComponent(vcardText);
+    } else {
+      const blob = new Blob([vcardText], { type: 'text/vcard;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 500);
+    }
     setActivePhoneModal(null);
   };
 
   const renderPhoneModalUI = (isMockup = false) => {
     if (!activePhoneModal) return null;
     const { contactName, phones } = activePhoneModal;
-    const primaryPhone = phones.find(p => p.isPrimary) || phones[0];
 
-    // Clear primary number to call
-    const callNumber = primaryPhone ? primaryPhone.number.replace(/[^\d+]/g, '') : '';
+    // Group all phones by department/label
+    const allGroupedPhones: Record<string, typeof phones> = {};
+    const labelOrder: string[] = [];
+
+    (phones || []).forEach(p => {
+      const l = p.label?.trim() || '';
+      if (!allGroupedPhones[l]) {
+        allGroupedPhones[l] = [];
+        labelOrder.push(l);
+      }
+      allGroupedPhones[l].push(p);
+    });
+
+    // Determine which labels have at least one visible phone
+    const visibleLabels = labelOrder.filter(l => {
+      const deptPhones = allGroupedPhones[l] || [];
+      return deptPhones.some(p => p.isVisible !== false);
+    });
+
+    // Main phone determines primary label
+    const primaryPhone = (phones || []).find(p => p.isPrimary && p.isVisible !== false) || (phones || []).find(p => p.isPrimary) || phones[0];
+    const primaryLabel = primaryPhone?.label?.trim() || '';
+
+    // Sort visible labels so primaryLabel comes first
+    const sortedLabels = [...visibleLabels].sort((a, b) => {
+      if (a === primaryLabel) return -1;
+      if (b === primaryLabel) return 1;
+      return 0;
+    });
 
     return (
       <>
@@ -3681,42 +3993,236 @@ export default function App() {
           className={`${isMockup ? 'absolute' : 'fixed'} inset-0 bg-black/40 backdrop-blur-sm z-[50]`} 
           onClick={() => setActivePhoneModal(null)} 
         />
-        <div className={`${isMockup ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 bg-neutral-900 rounded-t-2xl p-6 shadow-2xl z-[51] transform transition-transform text-white border-t border-neutral-800`}>
+        <div className={`${isMockup ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 bg-neutral-900 rounded-t-2xl p-6 shadow-2xl z-[51] transform transition-transform text-white border-t border-neutral-800 max-h-[80vh] overflow-y-auto`}>
           <div className="w-12 h-1.5 bg-neutral-700 rounded-full mx-auto mb-5" />
           
-          <h3 className="text-lg font-bold mb-1 text-center font-sans tracking-tight">
+          <h3 className="text-lg font-bold mb-5 text-center font-sans tracking-tight">
             {contactName || 'Contact'}
           </h3>
-          <p className="text-xs text-neutral-400 text-center mb-6 font-mono">
-            {primaryPhone?.number || ''} {phones.length > 1 ? `(+${phones.length - 1} ${lang === 'en' ? 'more' : 'еще'})` : ''}
-          </p>
 
-          <div className="space-y-3">
-            {primaryPhone && primaryPhone.number && (
-              <a 
-                href={`tel:${callNumber}`}
-                className="w-full py-3.5 bg-blue-500 hover:bg-blue-600 rounded-xl text-sm font-bold text-white flex justify-center items-center gap-2 transition-colors active:scale-[0.98]"
-              >
-                <Phone className="w-4 h-4" />
-                {lang === 'en' ? 'Call' : 'Позвонить'}
-              </a>
+          <div className="space-y-5">
+            {sortedLabels.map((label, gIdx) => {
+              const allDeptPhones = allGroupedPhones[label] || [];
+              const visibleDeptPhones = allDeptPhones.filter(p => p.isVisible !== false);
+              const displayLabel = label || (lang === 'en' ? 'Main' : 'Основной');
+              return (
+                <div key={gIdx} className="space-y-2 pb-4 border-b border-neutral-800/60 last:border-none last:pb-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-[10px] uppercase font-extrabold tracking-wider text-neutral-400 flex items-center gap-1.5">
+                      <span className="w-1.5 h-3 bg-blue-500 rounded-full" />
+                      <span>{displayLabel}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2.5">
+                    {visibleDeptPhones.map((phone, pIdx) => {
+                      const cleanNum = phone.number.replace(/[^\d+]/g, '');
+                      return (
+                        <div key={pIdx} className="flex gap-2 items-center">
+                          <a 
+                            href={`tel:${cleanNum}`}
+                            className="flex-1 h-[48px] bg-blue-500 hover:bg-blue-600 rounded-xl text-[13px] font-bold text-white flex justify-center items-center gap-2 transition-all active:scale-[0.98] px-4 truncate"
+                          >
+                            <Phone className="w-4 h-4 shrink-0" />
+                            <span className="truncate mt-[1px]">
+                              {phone.number}
+                            </span>
+                          </a>
+                          {pIdx === 0 ? (
+                            <button 
+                              onClick={() => downloadVCard(allDeptPhones, label)}
+                              className="w-[52px] h-[48px] flex items-center justify-center bg-[#282828] hover:bg-[#333333] text-blue-400 hover:text-blue-300 rounded-xl transition-all border border-neutral-700/50 shrink-0 cursor-pointer"
+                              title={lang === 'en' ? `Save ${displayLabel} to Contacts` : `Сохранить ${displayLabel} в контакты`}
+                            >
+                              <UserPlus className="w-[18px] h-[18px]" />
+                            </button>
+                          ) : (
+                            <div className="w-[52px] shrink-0" aria-hidden="true" />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  const renderMapModalUI = (isMockup = false) => {
+    if (!activeMapModal) return null;
+    const projContacts = activeProject?.contacts;
+    const address = activeMapModal.address || projContacts?.address || '';
+    const encodedAddress = encodeURIComponent(address);
+    const mapLinks = projContacts?.mapLinks || [];
+    const validMapLinks = mapLinks.filter(l => l.url && l.url.trim() !== '');
+
+    const hasAddress = address && address.trim() !== '';
+    const hasCustomLinks = validMapLinks.length > 0;
+
+    return (
+      <>
+        <div 
+          className={`${isMockup ? 'absolute' : 'fixed'} inset-0 bg-black/50 backdrop-blur-xs z-[50] animate-fade-in`} 
+          onClick={() => setActiveMapModal(null)} 
+        />
+        <div className={`${isMockup ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 bg-zinc-900 rounded-t-2xl p-5 shadow-2xl z-[51] text-white border-t border-zinc-800 animate-slide-up space-y-4 max-h-[85vh] flex flex-col`}>
+          <div className="w-12 h-1.5 bg-zinc-700 rounded-full mx-auto shrink-0" />
+          
+          <div className="flex items-center justify-between shrink-0 border-b border-zinc-800 pb-3">
+            <div className="flex items-center gap-2 text-zinc-100 min-w-0">
+              <MapPin className="w-5 h-5 text-rose-500 shrink-0" />
+              <h3 className="text-sm font-bold truncate">
+                {hasAddress ? address : (lang === 'en' ? 'Location Links' : 'Ссылки на карту')}
+              </h3>
+            </div>
+            <button 
+              onClick={() => setActiveMapModal(null)}
+              className="text-xs text-zinc-400 hover:text-white p-1 rounded-lg transition-colors font-mono font-bold cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Condition 1 & 2: Show Google Maps embed only if physical address is filled */}
+          {hasAddress && (
+            <div className="w-full shrink-0 relative">
+              <iframe 
+                className="w-full h-40 sm:h-52 rounded-lg border border-white/5" 
+                title="Google Map"
+                src={`https://maps.google.com/maps?q=${encodedAddress}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                loading="lazy"
+              />
+            </div>
+          )}
+
+          <div className="space-y-2 shrink-0 pt-1">
+            {/* If we have custom links, render them */}
+            {hasCustomLinks ? (
+              <div className="space-y-2">
+                {/* Render each custom link */}
+                {validMapLinks.map((link, idx) => (
+                  <a 
+                    key={idx}
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-xs font-bold text-white flex justify-center items-center gap-2 transition-all active:scale-[0.98] border border-zinc-750"
+                  >
+                    <ExternalLink className="w-4 h-4 text-indigo-400" />
+                    {link.label || (lang === 'en' ? 'Open Map' : 'Открыть карту')}
+                  </a>
+                ))}
+                {/* Also render the default Yandex Maps button as an option if address is filled */}
+                {hasAddress && (
+                  <a 
+                    href={`https://yandex.ru/maps/?rtext=~${encodedAddress}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white flex justify-center items-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-indigo-600/20"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    {lang === 'en' ? 'Yandex Maps (Route)' : 'Яндекс Карты (Проложить маршрут)'}
+                  </a>
+                )}
+              </div>
+            ) : (
+              /* Condition 1: Address filled and no custom links -> standard Yandex Maps button */
+              hasAddress && (
+                <a 
+                  href={`https://yandex.ru/maps/?rtext=~${encodedAddress}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white flex justify-center items-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-indigo-600/20"
+                >
+                  <Navigation className="w-4 h-4" />
+                  {lang === 'en' ? 'Get Directions' : 'Проложить маршрут'}
+                </a>
+              )
             )}
             
             <button 
-              onClick={downloadVCard}
-              className="w-full py-3.5 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-sm font-bold text-white flex justify-center items-center gap-2 transition-colors active:scale-[0.98] border border-neutral-700"
+              onClick={() => setActiveMapModal(null)}
+              className="w-full py-2 bg-transparent text-zinc-400 hover:text-white rounded-xl text-xs font-medium transition-colors cursor-pointer"
             >
-              <UserPlus className="w-4 h-4" />
-              {lang === 'en' ? 'Save to Contacts' : 'Добавить в контакты'}
-            </button>
-            
-            <button 
-              onClick={() => setActivePhoneModal(null)}
-              className="w-full py-3 bg-transparent text-neutral-400 hover:text-white rounded-xl text-sm font-medium transition-colors"
-            >
-              {lang === 'en' ? 'Cancel' : 'Отмена'}
+              {lang === 'en' ? 'Close' : 'Закрыть'}
             </button>
           </div>
+        </div>
+      </>
+    );
+  };
+
+  const renderSocialModalUI = (isMockup = false) => {
+    if (!activeSocialModal) return null;
+    const { platform, links } = activeSocialModal;
+
+    const platformNames: Record<string, { en: string; ru: string }> = {
+      telegram: { en: 'Telegram Options', ru: 'Telegram контакты' },
+      whatsapp: { en: 'WhatsApp Options', ru: 'WhatsApp контакты' },
+      instagram: { en: 'Instagram Options', ru: 'Instagram контакты' },
+      email: { en: 'Email Options', ru: 'Email адреса' },
+      website: { en: 'Website Options', ru: 'Сайты и ссылки' },
+      vk: { en: 'VKontakte Options', ru: 'VKontakte контакты' }
+    };
+
+    const platformMeta = platformNames[platform] || { en: 'Select Option', ru: 'Выберите контакт' };
+    const title = lang === 'en' ? platformMeta.en : platformMeta.ru;
+
+    return (
+      <>
+        <div 
+          className={`${isMockup ? 'absolute' : 'fixed'} inset-0 bg-black/50 backdrop-blur-xs z-[50] animate-fade-in`} 
+          onClick={() => setActiveSocialModal(null)} 
+        />
+        <div className={`${isMockup ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 bg-zinc-900 rounded-t-2xl p-5 shadow-2xl z-[51] text-white border-t border-zinc-800 animate-slide-up space-y-4 max-h-[85vh] flex flex-col`}>
+          <div className="w-12 h-1.5 bg-zinc-700 rounded-full mx-auto shrink-0" />
+          
+          <div className="flex items-center justify-between shrink-0 border-b border-zinc-800 pb-3">
+            <div className="flex items-center gap-2 text-zinc-100 min-w-0">
+              <span className="text-indigo-400 font-extrabold text-sm uppercase">
+                {platform}
+              </span>
+              <h3 className="text-sm font-bold truncate">
+                {title}
+              </h3>
+            </div>
+            <button 
+              onClick={() => setActiveSocialModal(null)}
+              className="text-xs text-zinc-400 hover:text-white p-1 rounded-lg transition-colors font-mono font-bold cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="space-y-2.5 overflow-y-auto max-h-[50vh] pr-1 py-1">
+            {links.map((link, idx) => {
+              const displayLabel = link.label?.trim() || `${platform.toUpperCase()} (${lang === 'en' ? 'Option' : 'Вариант'} ${idx + 1})`;
+              return (
+                <a 
+                  key={idx}
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => setActiveSocialModal(null)}
+                  className="w-full py-3.5 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-bold text-xs rounded-xl flex items-center justify-between transition-all active:scale-[0.99] border border-zinc-800/80 hover:border-indigo-500/50"
+                >
+                  <span className="truncate pr-4 text-left">{displayLabel}</span>
+                  <span className="text-[10px] font-mono text-zinc-500 max-w-[180px] truncate">{link.url.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                </a>
+              );
+            })}
+          </div>
+
+          <button 
+            onClick={() => setActiveSocialModal(null)}
+            className="w-full py-3 bg-transparent text-zinc-400 hover:text-white rounded-xl text-xs font-bold transition-all shrink-0 uppercase tracking-wider"
+          >
+            {lang === 'en' ? 'Cancel' : 'Отмена'}
+          </button>
         </div>
       </>
     );
@@ -4373,10 +4879,69 @@ export default function App() {
               )}
 
               {block.type === 'socials' && block.socialsContent && (() => {
-            const validLinks = block.socialsContent.links.filter(link => link.url.trim() !== '');
+            const projContacts = activeProject?.contacts;
+            const isStacked = block.socialsContent.layout === 'stacked';
+            let rawLinks: any[] = [];
+
+            if (projContacts) {
+              if (projContacts.socials && projContacts.socials.length > 0) {
+                projContacts.socials.forEach(s => {
+                  if (s.url && s.url.trim() !== '') {
+                    rawLinks.push({ platform: s.type, url: s.url, label: s.label });
+                  }
+                });
+              }
+
+              if (projContacts.phones && projContacts.phones.some(p => p.number && p.number.trim() !== '')) {
+                const primary = projContacts.phones.find(p => p.isPrimary) || projContacts.phones[0];
+                rawLinks.push({ 
+                  platform: 'phone', 
+                  url: `tel:${primary.number}`, 
+                  contactName: projContacts.contactName 
+                });
+              }
+
+              const hasAddress = projContacts.address && projContacts.address.trim() !== '';
+              const hasMapLinks = projContacts.mapLinks && projContacts.mapLinks.some(link => link.url && link.url.trim() !== '');
+              if (hasAddress || hasMapLinks) {
+                rawLinks.push({ 
+                  platform: 'map', 
+                  url: '', 
+                  address: projContacts.address || ''
+                });
+              }
+            }
+
+            if (rawLinks.length === 0 && block.socialsContent.links) {
+              rawLinks = block.socialsContent.links.filter(link => link.url && link.url.trim() !== '').map(l => ({ platform: l.platform, url: l.url, label: l.label }));
+            }
+
+            // Grouping logic based on layout type
+            let validLinks: any[] = [];
+            const linksByPlatform: Record<string, any[]> = {};
+            rawLinks.forEach(link => {
+              if (!linksByPlatform[link.platform]) {
+                linksByPlatform[link.platform] = [];
+              }
+              linksByPlatform[link.platform].push(link);
+            });
+
+            Object.keys(linksByPlatform).forEach(platform => {
+              const platformLinks = linksByPlatform[platform];
+              if (platformLinks.length > 1 && platform !== 'phone' && platform !== 'map') {
+                validLinks.push({
+                  platform,
+                  url: '',
+                  isGrouped: true,
+                  links: platformLinks
+                });
+              } else {
+                validLinks.push(platformLinks[0]);
+              }
+            });
+
             const maxPerRow = block.socialsContent.maxPerRow || 999;
             const iconSize = block.socialsContent.iconSize || 16;
-            const isStacked = block.socialsContent.layout === 'stacked';
             const iconStyle = block.socialsContent.iconStyle;
             
             const spacingClass = 
@@ -4630,11 +5195,13 @@ export default function App() {
                     {link.platform === 'whatsapp' && <Send size={iconSize} className="rotate-45" color={iconStrokeColor} />}
                     {link.platform === 'telegram' && <Send size={iconSize} color={iconStrokeColor} />}
                     {link.platform === 'website' && <Globe2 size={iconSize} color={iconStrokeColor} />}
+                    {link.platform === 'vk' && <Globe2 size={iconSize} color={iconStrokeColor} />}
+                    {link.platform === 'map' && <MapPin size={iconSize} color={iconStrokeColor} />}
                   </span>
                 </>
               );
 
-              if (link.platform === 'phone') {
+              if (link.platform === 'phone' && isLink) {
                 return (
                   <button
                     key={idx}
@@ -4642,17 +5209,68 @@ export default function App() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      if (block.socialsContent && block.socialsContent.phones && block.socialsContent.phones.length > 0) {
+                      const pContacts = activeProject?.contacts;
+                      if (pContacts?.phones && pContacts.phones.length > 0) {
+                        setActivePhoneModal({
+                          contactName: pContacts.contactName || activeProject?.name || 'Contact',
+                          phones: pContacts.phones
+                        });
+                      } else if (block.socialsContent && block.socialsContent.phones && block.socialsContent.phones.length > 0) {
                         setActivePhoneModal({
                           contactName: block.socialsContent.contactName || activeProject?.name || 'Contact',
                           phones: block.socialsContent.phones
                         });
                       } else {
-                        // Fallback if no phones defined
                         if (!isPreviewMockupMode && link.url) {
                           window.location.href = link.url;
                         }
                       }
+                    }}
+                    className={outerClassName}
+                    style={outerStyle}
+                    title={link.platform}
+                  >
+                    {innerContent}
+                  </button>
+                );
+              }
+
+              if (link.platform === 'map' && isLink) {
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const addr = link.address || activeProject?.contacts?.address || '';
+                      const mapLinks = activeProject?.contacts?.mapLinks || [];
+                      const hasMapLinks = mapLinks.some(l => l.url && l.url.trim() !== '');
+                      if (addr || hasMapLinks) {
+                        setActiveMapModal({ address: addr });
+                      }
+                    }}
+                    className={outerClassName}
+                    style={outerStyle}
+                    title={lang === 'en' ? 'Address Map Pin' : 'Интерактивная карта'}
+                  >
+                    {innerContent}
+                  </button>
+                );
+              }
+
+              if (link.isGrouped && isLink) {
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setActiveSocialModal({
+                        platform: link.platform,
+                        links: link.links
+                      });
                     }}
                     className={outerClassName}
                     style={outerStyle}
@@ -4700,17 +5318,23 @@ export default function App() {
                 github: { en: 'GitHub', ru: 'GitHub' },
                 email: { en: 'Email support', ru: 'Напишите на почту' },
                 phone: { en: 'Phone support', ru: 'Позвонить' },
-                website: { en: 'Website', ru: 'Открыть сайт' }
+                website: { en: 'Website', ru: 'Открыть сайт' },
+                vk: { en: 'VKontakte', ru: 'ВКонтакте' },
+                map: { en: 'Interactive Map', ru: 'Живая карта / Адрес' }
               };
 
               return (
                 <div className="flex flex-col w-full gap-2 opacity-100">
                   {validLinks.map((link, idx) => {
                     const platformMeta = platformNames[link.platform] || { en: 'Link', ru: 'Ссылка' };
-                    const platformLabel = lang === 'en' ? platformMeta.en : platformMeta.ru;
+                    const platformLabel = link.label?.trim() || (lang === 'en' ? platformMeta.en : platformMeta.ru);
                     
-                    let subLabel = '';
-                    if (link.url) {
+                    let subLabel = link.address || '';
+                    if (link.isGrouped && link.links) {
+                      const len = link.links.length;
+                      const suffix = (len % 10 === 1 && len % 100 !== 11) ? 'ссылка' : ((len % 10 >= 2 && len % 10 <= 4 && (len % 100 < 10 || len % 100 >= 20)) ? 'ссылки' : 'ссылок');
+                      subLabel = lang === 'en' ? `${len} links` : `${len} ${suffix}`;
+                    } else if (!subLabel && link.url) {
                       subLabel = link.url
                         .trim()
                         .replace('mailto:', '')
@@ -4724,7 +5348,6 @@ export default function App() {
                     }
 
                     const sharedProps = {
-                      key: idx,
                       className: `flex items-center justify-between w-full p-2.5 transition-all duration-150 active:scale-[0.99] border hover:shadow-xs ${radiusClass} ${
                         block.customTextColor
                           ? ''
@@ -4753,14 +5376,40 @@ export default function App() {
                       </>
                     );
 
-                    if (link.platform === 'phone') {
+                    if (link.isGrouped) {
                       return (
                         <button
+                          key={idx}
                           {...sharedProps}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            if (block.socialsContent && block.socialsContent.phones && block.socialsContent.phones.length > 0) {
+                            setActiveSocialModal({
+                              platform: link.platform,
+                              links: link.links
+                            });
+                          }}
+                        >
+                          {inner}
+                        </button>
+                      );
+                    }
+
+                    if (link.platform === 'phone') {
+                      return (
+                        <button
+                          key={idx}
+                          {...sharedProps}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const pContacts = activeProject?.contacts;
+                            if (pContacts?.phones && pContacts.phones.length > 0) {
+                              setActivePhoneModal({
+                                contactName: pContacts.contactName || activeProject?.name || 'Contact',
+                                phones: pContacts.phones
+                              });
+                            } else if (block.socialsContent && block.socialsContent.phones && block.socialsContent.phones.length > 0) {
                               setActivePhoneModal({
                                 contactName: block.socialsContent.contactName || activeProject?.name || 'Contact',
                                 phones: block.socialsContent.phones
@@ -4777,8 +5426,30 @@ export default function App() {
                       );
                     }
 
+                    if (link.platform === 'map') {
+                      return (
+                        <button
+                          key={idx}
+                          {...sharedProps}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const addr = link.address || activeProject?.contacts?.address || '';
+                            const mapLinks = activeProject?.contacts?.mapLinks || [];
+                            const hasMapLinks = mapLinks.some(l => l.url && l.url.trim() !== '');
+                            if (addr || hasMapLinks) {
+                              setActiveMapModal({ address: addr });
+                            }
+                          }}
+                        >
+                          {inner}
+                        </button>
+                      );
+                    }
+
                     return (
                       <a
+                        key={idx}
                         {...sharedProps}
                         href={isPreviewMockupMode ? undefined : link.url}
                         target="_blank"
@@ -4800,8 +5471,8 @@ export default function App() {
             return (
               <div className={`flex flex-col items-center ${spacingClass}`}>
                 {rows.map((row, rowIdx) => (
-                  <div key={rowIdx} className={`flex flex-wrap justify-center ${spacingClass}`}>
-                    {row.map((link, idx) => renderIconInnerAndWrapper(link, idx, true))}
+                  <div key={`row-${rowIdx}`} className={`flex flex-wrap justify-center ${spacingClass}`}>
+                    {row.map((link, idx) => renderIconInnerAndWrapper(link, rowIdx * maxPerRow + idx, true))}
                   </div>
                 ))}
               </div>
@@ -5919,37 +6590,52 @@ export default function App() {
                 </button>
               )}
 
-              {/* Notification bell */}
-              {isAuthenticated && (
+              {/* MINIMALIST 3 FINE-LINE ICONS HEADER */}
+              <div className="flex items-center gap-3 sm:gap-4">
+                {/* Icon 1: Bell with Notification indicator */}
                 <div className="relative">
-                  <button 
+                  <button
                     onClick={() => {
                       setIsNotificationsOpen(!isNotificationsOpen);
+                      setIsProfileMenuOpen(false);
                       setIsBurgerMenuOpen(false);
                     }}
-                    className="text-zinc-400 hover:text-white p-2 rounded-lg bg-zinc-900/40 hover:bg-zinc-900/80 border border-zinc-800/60 transition-colors relative h-9 w-9 flex items-center justify-center cursor-pointer"
+                    className="relative p-1.5 focus:outline-none cursor-pointer group"
+                    title={lang === 'en' ? 'Notifications' : 'Уведомления'}
                   >
-                    <Bell size={15} />
-                    <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-rose-500 rounded-full ring-2 ring-zinc-950" />
+                    <svg
+                      className="w-5 h-5 text-white/30 hover:text-white transition-all duration-200"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                    </svg>
+                    <span className="absolute top-0 right-0 bg-indigo-500 w-1.5 h-1.5 rounded-full ring-2 ring-black" />
                   </button>
+
                   {isNotificationsOpen && (
-                    <div className="absolute right-0 mt-2 w-72 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl p-4 z-50 animate-scale-up">
-                      <div className="flex items-center justify-between border-b border-zinc-800 pb-2 mb-2">
+                    <div className="absolute right-0 mt-3 w-72 bg-neutral-900 border border-white/5 rounded-xl shadow-2xl p-4 z-[70] animate-fade-in text-white">
+                      <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-2">
                         <span className="font-bold text-xs text-white">
                           {lang === 'en' ? 'Notifications' : 'Уведомления'}
                         </span>
                         <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded font-bold font-mono">1 new</span>
                       </div>
                       <div className="space-y-2 py-1 max-h-48 overflow-y-auto">
-                        <div className="flex gap-2.5 p-2 rounded-lg bg-zinc-850 border border-zinc-800/60">
+                        <div className="flex gap-2.5 p-2 rounded-lg bg-zinc-850 border border-white/5">
                           <span className="w-2 h-2 bg-indigo-500 rounded-full mt-1.5 shrink-0" />
                           <div>
                             <p className="text-xs font-semibold text-zinc-100">
                               {lang === 'en' ? 'Welcome to SLM Cards!' : 'Добро пожаловать в SLM Cards!'}
                             </p>
                             <p className="text-[10px] text-zinc-400 leading-normal mt-0.5">
-                              {lang === 'en' 
-                                ? 'Start creating premium interactive micro-landings in minutes.' 
+                              {lang === 'en'
+                                ? 'Start creating premium interactive micro-landings in minutes.'
                                 : 'Начните создавать интерактивные микролендинги за пару минут.'}
                             </p>
                           </div>
@@ -5958,187 +6644,108 @@ export default function App() {
                     </div>
                   )}
                 </div>
-              )}
 
-              {/* RU/ENG Selector */}
-              <button
-                onClick={() => setLang(l => l === 'en' ? 'ru' : 'en')}
-                className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 hover:text-white p-2 h-9 flex items-center justify-center bg-zinc-900/40 hover:bg-zinc-900/80 border border-zinc-800/60 rounded-lg transition-all cursor-pointer"
-                title={lang === 'en' ? 'Switch to Russian' : 'Переключить на английский'}
-              >
-                {lang === 'en' ? 'RU' : 'EN'}
-              </button>
-
-              {/* Profile card / Login button */}
-              {!isAuthenticated ? (
-                <div className="hidden sm:flex items-center gap-1.5">
-                  <button 
-                    onClick={() => {
-                      setIsAuthModalOpen(true);
-                    }}
-                    className="text-xs font-bold px-3 py-1.5 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                  >
-                    {lang === 'en' ? 'Login' : 'Войти'}
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setIsAuthModalOpen(true);
-                    }}
-                    className="text-xs font-bold px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors shadow-lg shadow-indigo-600/10 cursor-pointer"
-                  >
-                    {lang === 'en' ? 'Register' : 'Регистрация'}
-                  </button>
-                </div>
-              ) : (
-                <div className="hidden sm:flex items-center gap-2 bg-zinc-900/40 hover:bg-zinc-900/80 border border-zinc-800/60 p-1.5 pr-3 rounded-xl transition-all select-none">
-                  <div className="w-6 h-6 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-[10px] uppercase shadow-sm">
-                    US
-                  </div>
-                  <div className="flex flex-col text-left leading-none">
-                    <span className="text-[10px] font-bold text-zinc-200">ivemaker</span>
-                    <button 
-                      onClick={() => {
-                        logout();
-                      }}
-                      className="text-[9px] font-semibold text-zinc-500 hover:text-rose-450 text-left cursor-pointer transition-colors mt-0.5 leading-none"
-                    >
-                      {lang === 'en' ? 'Sign out' : 'Выйти'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 🍔 BURGER MENU TRIGGER BUTTON & DROPDOWN */}
-              <div className="relative">
+                {/* Icon 2: Text switch for language */}
                 <button
-                  onClick={() => {
-                    setIsBurgerMenuOpen(!isBurgerMenuOpen);
-                    setIsNotificationsOpen(false);
-                  }}
-                  className="p-2 text-zinc-400 hover:text-white rounded-lg bg-zinc-900/40 hover:bg-zinc-900/80 border border-zinc-800/60 transition-colors flex items-center justify-center h-9 w-9 cursor-pointer"
-                  title="Menu / Меню"
+                  onClick={() => setLang(l => l === 'en' ? 'ru' : 'en')}
+                  className="p-1.5 focus:outline-none cursor-pointer flex items-center justify-center min-w-[32px]"
+                  title={lang === 'en' ? 'Switch Language' : 'Переключить язык'}
                 >
-                  {isBurgerMenuOpen ? <X size={16} /> : <Menu size={16} />}
+                  <span className="text-[11px] font-bold tracking-wider text-white/40 hover:text-white transition-all duration-200 uppercase">
+                    {lang === 'en' ? 'EN' : 'RU'}
+                  </span>
                 </button>
 
-                {/* SMOOTH ANIMATED BURGER DROPDOWN LIST */}
-                <AnimatePresence>
-                  {isBurgerMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute right-0 mt-2 w-64 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 p-1.5 flex flex-col gap-0.5"
+                {/* Icon 3: Profile with Dropdown */}
+                <div className="relative" ref={profileDropdownRef}>
+                  <button
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        setIsAuthModalOpen(true);
+                      } else {
+                        setIsProfileMenuOpen(prev => !prev);
+                        setIsNotificationsOpen(false);
+                      }
+                    }}
+                    className="p-1.5 focus:outline-none cursor-pointer flex items-center"
+                    title={lang === 'en' ? 'Account Profile' : 'Профиль аккаунта'}
+                  >
+                    <svg
+                      className="w-5 h-5 text-white/30 hover:text-white transition-all duration-200"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      {/* Navigation links for MOBILE/TABLET (since they are hidden in center on small screens) */}
-                      {isAuthenticated && (
-                        <div className="md:hidden flex flex-col gap-0.5">
-                          <div className="px-3 py-1.5 text-[9px] text-zinc-500 uppercase tracking-wider font-bold">
-                            {lang === 'en' ? 'Workspace' : 'Рабочая область'}
+                      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                  </button>
+
+                  {/* STEP 2 Dropdown Menu */}
+                  {isAuthenticated && isProfileMenuOpen && (
+                    <div className="absolute right-0 mt-3 w-56 bg-neutral-900 border border-white/5 rounded-xl shadow-2xl p-2 z-[70] text-white animate-fade-in">
+                      <div className="px-3 py-2 border-b border-white/5 mb-1 flex items-center justify-between">
+                        <div className="truncate">
+                          <div className="text-xs font-bold text-white truncate">
+                            {userEmail ? userEmail.split('@')[0] : 'ivemaker'}
                           </div>
-                          
-                          <button
-                            onClick={() => {
-                              setActiveTab('projects');
-                              setIsBurgerMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left cursor-pointer ${
-                              activeTab === 'projects' ? 'bg-indigo-600 text-white' : 'text-zinc-300 hover:bg-zinc-800'
-                            }`}
-                          >
-                            <FolderOpen size={14} className="shrink-0" />
-                            <span>{lang === 'en' ? 'My Projects' : 'Мои проекты'}</span>
-                          </button>
-                          
-                          <div className="h-px bg-zinc-800/60 my-1" />
-                        </div>
-                      )}
-
-                      {/* Public Navigation */}
-                      <div className="md:hidden flex flex-col gap-0.5">
-                        <div className="px-3 py-1.5 text-[9px] text-zinc-500 uppercase tracking-wider font-bold">
-                          {lang === 'en' ? 'Navigation' : 'Навигация'}
-                        </div>
-                        <div className="h-px bg-zinc-800/60 my-1" />
-                      </div>
-
-                      {/* Management section */}
-                      <div className="px-3 py-1.5 text-[9px] text-zinc-500 uppercase tracking-wider font-bold">
-                        {lang === 'en' ? 'Management' : 'Управление'}
-                      </div>
-
-                      {isAuthenticated ? (
-                        <>
-                          <button
-                            onClick={() => {
-                              setActiveTab('settings');
-                              setIsBurgerMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer ${
-                              activeTab === 'settings' ? 'bg-zinc-800 text-indigo-400' : 'text-zinc-300 hover:bg-zinc-800'
-                            }`}
-                          >
-                            <Settings size={14} className="text-zinc-400 shrink-0" />
-                            <span>{lang === 'en' ? 'Platform Settings' : 'Настройки платформы'}</span>
-                          </button>
-                        </>
-                      ) : (
-                        <div className="text-[10px] text-zinc-500 italic px-3 py-2 bg-zinc-950/40 rounded-lg">
-                          {lang === 'en' ? 'Sign in to access analytics & settings.' : 'Войдите для доступа к аналитике и настройкам.'}
-                        </div>
-                      )}
-
-                      <div className="h-px bg-zinc-800/60 my-1" />
-
-                      {/* Account section */}
-                      <div className="px-3 py-1.5 text-[9px] text-zinc-500 uppercase tracking-wider font-bold">
-                        {lang === 'en' ? 'Account Profile' : 'Профиль аккаунта'}
-                      </div>
-
-                      {isAuthenticated ? (
-                        <div className="p-1 flex flex-col gap-1">
-                          <div className="flex items-center gap-2 px-2 py-1.5 bg-zinc-950/30 rounded-lg border border-zinc-800/40">
-                            <div className="w-6 h-6 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-[10px] uppercase shrink-0">
-                              US
-                            </div>
-                            <div className="min-w-0 flex-1 leading-none">
-                              <p className="text-[10px] font-bold text-zinc-200 truncate leading-none">ivemaker@gmail.com</p>
-                              <p className="text-[8px] text-zinc-500 font-mono leading-none mt-1">
-                                {lang === 'en' ? 'Authorized Creator' : 'Создатель'}
-                              </p>
-                            </div>
+                          <div className="text-[10px] text-zinc-400 font-mono truncate">
+                            {userEmail || 'ivemaker@slmcards.io'}
                           </div>
-                          
-                          <button
-                            onClick={() => {
-                              logout();
-                              setIsBurgerMenuOpen(false);
-                            }}
-                            className="w-full mt-1 px-3 py-2 bg-rose-950/20 hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 transition-colors text-left text-xs font-bold rounded-lg flex items-center gap-2.5 cursor-pointer"
-                          >
-                            <LogOut size={13} className="shrink-0 text-rose-455" />
-                            <span>{lang === 'en' ? 'Sign Out / Exit' : 'Выйти из аккаунта'}</span>
-                          </button>
                         </div>
-                      ) : (
-                        <div className="p-1">
-                          <button
-                            onClick={() => {
-                              setIsAuthModalOpen(true);
-                              setIsBurgerMenuOpen(false);
-                            }}
-                            className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition-colors text-center cursor-pointer flex items-center justify-center gap-2"
-                          >
-                            <User size={13} />
-                            <span>{lang === 'en' ? 'Sign In / Log In' : 'Войти в аккаунт'}</span>
-                          </button>
-                        </div>
-                      )}
-                    </motion.div>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <button
+                          onClick={() => {
+                            setActiveTab('projects');
+                            setIsProfileMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left"
+                        >
+                          <svg className="w-4 h-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                          </svg>
+                          <span>{lang === 'en' ? 'My Projects' : 'Мои проекты'}</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setActiveTab('profile_dashboard');
+                            setIsProfileMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left"
+                        >
+                          <svg className="w-4 h-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                          </svg>
+                          <span>{lang === 'en' ? 'Account Settings' : 'Настройки аккаунта'}</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            logout();
+                            setIsProfileMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer text-left"
+                        >
+                          <svg className="w-4 h-4 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
+                          </svg>
+                          <span>{lang === 'en' ? 'Logout' : 'Выйти'}</span>
+                        </button>
+                      </div>
+                    </div>
                   )}
-                </AnimatePresence>
+                </div>
               </div>
+
             </div>
           </div>
         </header>
@@ -6225,7 +6832,7 @@ export default function App() {
                 handleDropAtRoot={handleDropAtRoot}
                 setDragOverBlockId={setDragOverBlockId}
                 setDragPosition={setDragPosition}
-                presets={customReadyTemplates}
+                presets={allReadyTemplates}
                 userTemplates={userTemplates}
                 currentConfig={config}
                 onApplyTemplate={setTemplateToApply}
@@ -6555,6 +7162,8 @@ export default function App() {
                               </div>
                               {renderCartUI(true)}
                               {renderPhoneModalUI(true)}
+                              {renderMapModalUI(true)}
+                              {renderSocialModalUI(true)}
                             </div>
                           );
                         })()}
@@ -6635,6 +7244,8 @@ export default function App() {
                                 </div>
                                 {renderCartUI(true)}
                                 {renderPhoneModalUI(true)}
+                                {renderMapModalUI(true)}
+                                {renderSocialModalUI(true)}
                               </div>
                             );
                           })()}
@@ -6693,6 +7304,11 @@ export default function App() {
         {/* SETTINGS TAB */}
         {isAuthenticated && activeTab === 'settings' && (
           <SettingsTab lang={lang} />
+        )}
+
+        {/* PROFILE DASHBOARD TAB */}
+        {isAuthenticated && activeTab === 'profile_dashboard' && (
+          <ProfileDashboard lang={lang} />
         )}
           </main>
         </div>
@@ -6790,6 +7406,8 @@ export default function App() {
 
                   {renderCartUI()}
                   {renderPhoneModalUI()}
+                  {renderMapModalUI()}
+                  {renderSocialModalUI()}
 
                   {/* Static tiny trademark footer */}
                   <footer className={`mt-14 text-center border-t pt-6 text-[10px] font-mono tracking-wider w-full ${

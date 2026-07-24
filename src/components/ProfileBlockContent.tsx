@@ -511,6 +511,25 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
           >
             {profile.name}
           </h2>
+          {profile.subtitle && (
+            <h3 
+              className={`opacity-90 font-medium ${(block.subtitleTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''}`}
+              style={{
+                ...(block.customSubtitleColor ? { color: block.customSubtitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
+                ...(block.customSubtitleFont ? { fontFamily: block.customSubtitleFont } : {}),
+                fontSize: block.customSubtitleFontSize !== undefined ? `${block.customSubtitleFontSize}px` : '14px',
+                ...(block.subtitleTextStyles?.textBold ? { fontWeight: 'bold' } : {}),
+                ...(block.subtitleTextStyles?.textItalic ? { fontStyle: 'italic' } : {}),
+                ...(block.subtitleTextStyles?.textUnderline ? { textDecoration: 'underline' } : {}),
+                ...(block.subtitleTextStyles?.textLineHeight ? { lineHeight: block.subtitleTextStyles.textLineHeight } : {}),
+                ...(block.subtitleTextStyles?.textLetterSpacing ? { letterSpacing: `${block.subtitleTextStyles.textLetterSpacing}px` } : {}),
+                ...(block.subtitleTextStyles?.textTransform ? { textTransform: block.subtitleTextStyles.textTransform } : {}),
+                ...(block.subtitleTextStyles?.textAlign ? { textAlign: block.subtitleTextStyles.textAlign } : {}),
+              }}
+            >
+              {profile.subtitle}
+            </h3>
+          )}
           {!isRow && (
             <p 
               className={`text-xs opacity-85 leading-relaxed font-light whitespace-pre-line break-words max-w-full ${(block.descTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''}`}
@@ -529,6 +548,25 @@ export const ProfileBlockContent: React.FC<ProfileBlockContentProps> = ({
         {isAvatarRight && avatarElement}
       </div>
       
+      {isRow && profile.subtitle && (
+        <h3 
+          className={`opacity-90 font-medium ${(block.subtitleTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''}`}
+          style={{
+            ...(block.customSubtitleColor ? { color: block.customSubtitleColor } : block.customTextColor ? { color: block.customTextColor } : {}),
+            ...(block.customSubtitleFont ? { fontFamily: block.customSubtitleFont } : {}),
+            fontSize: block.customSubtitleFontSize !== undefined ? `${block.customSubtitleFontSize}px` : '14px',
+            ...(block.subtitleTextStyles?.textBold ? { fontWeight: 'bold' } : {}),
+            ...(block.subtitleTextStyles?.textItalic ? { fontStyle: 'italic' } : {}),
+            ...(block.subtitleTextStyles?.textUnderline ? { textDecoration: 'underline' } : {}),
+            ...(block.subtitleTextStyles?.textLineHeight ? { lineHeight: block.subtitleTextStyles.textLineHeight } : {}),
+            ...(block.subtitleTextStyles?.textLetterSpacing ? { letterSpacing: `${block.subtitleTextStyles.textLetterSpacing}px` } : {}),
+            ...(block.subtitleTextStyles?.textTransform ? { textTransform: block.subtitleTextStyles.textTransform } : {}),
+            ...(block.subtitleTextStyles?.textAlign ? { textAlign: block.subtitleTextStyles.textAlign } : {}),
+          }}
+        >
+          {profile.subtitle}
+        </h3>
+      )}
       {isRow && profile.bio && (
         <p 
           className={`text-xs opacity-85 leading-relaxed font-light whitespace-pre-line break-words max-w-full ${(block.descTextStyles?.textShimmerEnabled || block.textShimmerEnabled) ? 'text-shimmer-effect' : ''}`}

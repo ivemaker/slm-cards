@@ -1,8 +1,40 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useToast } from './ToastContext';
+import { set } from 'idb-keyval';
 
 export type PlanType = 'unpaid' | 'basic' | 'premium';
-export type TabType = 'landing' | 'projects' | 'editor' | 'dashboard' | 'preview' | 'settings';
+export type TabType = 'landing' | 'projects' | 'editor' | 'dashboard' | 'preview' | 'settings' | 'profile_dashboard';
+
+export interface ProjectContacts {
+  contactName: string; // Имя vCard (FN)
+  address: string;     // Физический адрес / Геолокация
+  phones: { number: string; isPrimary: boolean; label?: string; isVisible?: boolean }[]; // Список телефонов
+  socials: { type: string; url: string; label?: string }[]; // Список ссылок на мессенджеры/соцсети
+  mapLinks?: { label: string; url: string }[]; // Ссылки на карты (Яндекс, 2ГИС и др.)
+}
+
+export function getDefaultContacts(projectName: string = '', existing?: Partial<ProjectContacts>): ProjectContacts {
+  const defaultSocials = [
+    { type: 'telegram', url: '' },
+    { type: 'whatsapp', url: '' }
+  ];
+
+  const phones = existing?.phones && existing.phones.length > 0 
+    ? existing.phones 
+    : [{ number: '', isPrimary: true }];
+
+  const socials = existing?.socials && existing.socials.length > 0 
+    ? existing.socials 
+    : defaultSocials;
+
+  return {
+    contactName: existing?.contactName || projectName || '',
+    address: existing?.address || '',
+    phones: phones,
+    socials: socials,
+    mapLinks: existing?.mapLinks || []
+  };
+}
 
 export interface MockProject {
   id: string;
@@ -21,6 +53,7 @@ export interface MockProject {
   cart?: { blockId: string; name: string; price: number; quantity: number }[];
   customDomain?: string;
   premiumExpiredAt?: string;
+  contacts?: ProjectContacts;
 }
 
 export interface DevContextType {
@@ -56,6 +89,12 @@ export interface DevContextType {
   startPreview: () => void;
   cancelPreview: () => void;
   applyPreviewTemplate: () => void;
+  userEmail: string;
+  userBalance: number;
+  isBalanceHidden: boolean;
+  toggleBalanceVisibility: () => void;
+  topUpBalance: (amount: number) => void;
+  updateCredentials: (email: string) => void;
 }
 
 const DevContext = createContext<DevContextType | undefined>(undefined);
@@ -78,6 +117,25 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [activeProjectId, setActiveProjectIdState] = useState<string | null>(() => getSaved<string | null>('slm_active_project_id', null));
   const [isSaving, setIsSaving] = useState(false);
   const [developerMode, setDeveloperMode] = useState<boolean>(() => getSaved<boolean>('slm_developer_mode', false));
+  const [userEmail, setUserEmail] = useState<string>(() => getSaved<string>('slm_user_email', 'ivemaker@slmcards.io'));
+  const [userBalance, setUserBalance] = useState<number>(() => getSaved<number>('slm_user_balance', 1500));
+  const [isBalanceHidden, setIsBalanceHidden] = useState<boolean>(() => getSaved<boolean>('slm_is_balance_hidden', false));
+
+  const toggleBalanceVisibility = () => {
+    setIsBalanceHidden(prev => !prev);
+  };
+
+  const topUpBalance = (amount: number) => {
+    if (isNaN(amount) || amount <= 0) return;
+    setUserBalance(prev => prev + amount);
+    toast.success(`Баланс пополнен на ${amount.toLocaleString('ru-RU')} ₽`);
+  };
+
+  const updateCredentials = (email: string) => {
+    if (!email || !email.trim()) return;
+    setUserEmail(email.trim());
+    toast.success('Данные аккаунта успешно обновлены');
+  };
 
   const [projectBackup, setProjectBackup] = useState<MockProject | null>(null);
   const [previewScope, setPreviewScope] = useState<'all' | 'blocks' | 'backgrounds'>('all');
@@ -112,7 +170,7 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         type: 'personal_card',
         plan: 'basic',
         tariff: 'Basic',
-        createdAt: new Date().toLocaleDateString('ru-RU'),
+        createdAt: new Date().toISOString(),
         layout: 'classic',
         themeStyle: 'cosmic',
         description: 'Личная интерактивная визитка'
@@ -123,7 +181,7 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         type: 'menu',
         plan: 'premium',
         tariff: 'Premium',
-        createdAt: new Date().toLocaleDateString('ru-RU'),
+        createdAt: new Date().toISOString(),
         layout: 'compact',
         themeStyle: 'sunset',
         description: 'Официальное меню нашего ресторана'
@@ -132,7 +190,8 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const initial = saved.length > 0 ? saved : defaultProjects;
     return initial.map(p => ({
       ...p,
-      tariff: p.tariff || (p.plan === 'premium' ? 'Premium' : 'Basic')
+      tariff: p.tariff || (p.plan === 'premium' ? 'Premium' : 'Basic'),
+      contacts: getDefaultContacts(p.name, p.contacts)
     })) as MockProject[];
   });
 
@@ -146,6 +205,9 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       localStorage.setItem('slm_projects', JSON.stringify(projects));
       localStorage.setItem('slm_developer_mode', JSON.stringify(developerMode));
       localStorage.setItem('slm_auth_status', JSON.stringify(isAuthenticated));
+      localStorage.setItem('slm_user_email', JSON.stringify(userEmail));
+      localStorage.setItem('slm_user_balance', JSON.stringify(userBalance));
+      localStorage.setItem('slm_is_balance_hidden', JSON.stringify(isBalanceHidden));
 
       if (firstRender.current) {
         firstRender.current = false;
@@ -268,8 +330,9 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       description,
       layout,
       themeStyle,
-      createdAt: new Date().toLocaleDateString('ru-RU'),
-      cart: []
+      createdAt: new Date().toISOString(),
+      cart: [],
+      contacts: getDefaultContacts(name)
     };
     setProjects(prev => [...prev, newProject]);
     setActiveProjectId(newId);
@@ -292,6 +355,37 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (updates.plan) {
           merged.tariff = updates.plan === 'premium' ? 'Premium' : updates.plan === 'unpaid' ? 'Unpaid' : 'Basic';
         }
+
+        // Card to Editor Sync: Sync project name and avatar changes into the stored configuration blocks
+        if (updates.name !== undefined || updates.avatar !== undefined) {
+          const configKey = `nocode_cfg_project_${id}`;
+          try {
+            const savedStr = localStorage.getItem(configKey);
+            if (savedStr) {
+              const config = JSON.parse(savedStr);
+              if (config && config.blocks) {
+                config.blocks = config.blocks.map((b: any) => {
+                  if (b.type === 'profile') {
+                    return {
+                      ...b,
+                      profileContent: {
+                        ...(b.profileContent || {}),
+                        ...(updates.name !== undefined ? { name: updates.name } : {}),
+                        ...(updates.avatar !== undefined ? { avatar: updates.avatar } : {})
+                      }
+                    };
+                  }
+                  return b;
+                });
+                localStorage.setItem(configKey, JSON.stringify(config));
+                set(configKey, config).catch(e => console.error("Failed to save project blocks sync to IndexedDB", e));
+              }
+            }
+          } catch (e) {
+            console.warn("Failed to sync project updates to blocks config", e);
+          }
+        }
+
         return merged;
       }
       return p;
@@ -324,7 +418,13 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setPreviewScope,
         startPreview,
         cancelPreview,
-        applyPreviewTemplate
+        applyPreviewTemplate,
+        userEmail,
+        userBalance,
+        isBalanceHidden,
+        toggleBalanceVisibility,
+        topUpBalance,
+        updateCredentials
       }}
     >
       {children}

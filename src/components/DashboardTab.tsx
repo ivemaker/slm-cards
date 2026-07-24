@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { useDev } from '../context/DevContext';
+import { useDev, ProjectContacts, getDefaultContacts } from '../context/DevContext';
 import { useToast } from '../context/ToastContext';
 import {
   TrendingUp,
@@ -25,12 +25,573 @@ import {
   Copy,
   ExternalLink,
   Loader2,
-  Lock
+  Lock,
+  Share2,
+  Phone,
+  MapPin,
+  Plus,
+  Trash2,
+  CheckCircle2,
+  Send,
+  Globe,
+  Mail
 } from 'lucide-react';
 
 interface DashboardTabProps {
   lang: 'en' | 'ru';
 }
+
+const ProjectContactsSection: React.FC<{
+  activeProject: any;
+  updateProject: (id: string, updates: any) => void;
+  lang: 'en' | 'ru';
+  toastSuccess: (msg: string) => void;
+}> = ({ activeProject, updateProject, lang, toastSuccess }) => {
+  const [localContacts, setLocalContacts] = React.useState<ProjectContacts>(() => {
+    return activeProject?.contacts || getDefaultContacts(activeProject?.name || '');
+  });
+
+  React.useEffect(() => {
+    if (activeProject?.contacts) {
+      setLocalContacts(activeProject.contacts);
+    } else if (activeProject?.name) {
+      setLocalContacts(getDefaultContacts(activeProject.name));
+    }
+  }, [activeProject?.id, activeProject?.contacts]);
+
+  const handleSaveAll = () => {
+    updateProject(activeProject.id, { contacts: localContacts });
+    toastSuccess(lang === 'en' ? 'Project contacts saved successfully!' : 'Контакты проекта успешно сохранены!');
+  };
+
+  const handleContactNameChange = (val: string) => {
+    setLocalContacts(prev => ({ ...prev, contactName: val }));
+  };
+
+  const handleAddressChange = (val: string) => {
+    setLocalContacts(prev => ({ ...prev, address: val }));
+  };
+
+  const handleAddMapLink = () => {
+    setLocalContacts(prev => ({
+      ...prev,
+      mapLinks: [...(prev.mapLinks || []), { label: '', url: '' }]
+    }));
+  };
+
+  const handleRemoveMapLink = (idx: number) => {
+    setLocalContacts(prev => ({
+      ...prev,
+      mapLinks: (prev.mapLinks || []).filter((_, i) => i !== idx)
+    }));
+  };
+
+  const handleMapLinkChange = (idx: number, field: 'label' | 'url', val: string) => {
+    setLocalContacts(prev => ({
+      ...prev,
+      mapLinks: (prev.mapLinks || []).map((link, i) => i === idx ? { ...link, [field]: val } : link)
+    }));
+  };
+
+  const sortPhones = (phones: any[]) => {
+    const typeOrder: string[] = [];
+    phones.forEach(p => {
+      const l = p.label || '';
+      if (!typeOrder.includes(l)) {
+        typeOrder.push(l);
+      }
+    });
+    return [...phones].sort((a, b) => {
+      const idxA = typeOrder.indexOf(a.label || '');
+      const idxB = typeOrder.indexOf(b.label || '');
+      return idxA - idxB;
+    });
+  };
+
+  const handlePhoneVisibilityChange = (idx: number, isVisible: boolean) => {
+    setLocalContacts(prev => {
+      const newPhones = prev.phones.map((p, i) => i === idx ? { ...p, isVisible } : p);
+      return { ...prev, phones: newPhones };
+    });
+  };
+
+  const handlePhoneChange = (idx: number, number: string) => {
+    setLocalContacts(prev => {
+      const newPhones = prev.phones.map((p, i) => i === idx ? { ...p, number: number.replace(/[^\d+]/g, '') } : p);
+      return { ...prev, phones: newPhones };
+    });
+  };
+
+  const handleAddDepartment = () => {
+    setLocalContacts(prev => {
+      const deptCount = new Set((prev.phones || []).map(p => p.label || '')).size;
+      const newLabel = lang === 'en' ? `Department ${deptCount + 1}` : `Отдел ${deptCount + 1}`;
+      const newPhones = [...prev.phones, { number: '', isPrimary: prev.phones.length === 0, label: newLabel, isVisible: true }];
+      return { ...prev, phones: newPhones };
+    });
+  };
+
+  const handleAddPhoneToDept = (label: string) => {
+    setLocalContacts(prev => {
+      const newPhones = [...prev.phones, { number: '', isPrimary: false, label, isVisible: true }];
+      return { ...prev, phones: newPhones };
+    });
+  };
+
+  const handleUpdateDeptLabel = (oldLabel: string, newLabel: string) => {
+    setLocalContacts(prev => {
+      const newPhones = prev.phones.map(p => (p.label || '') === oldLabel ? { ...p, label: newLabel } : p);
+      return { ...prev, phones: newPhones };
+    });
+  };
+
+  const handleSetPrimaryDept = (targetLabel: string) => {
+    setLocalContacts(prev => {
+      let found = false;
+      const newPhones = prev.phones.map(p => {
+        const isMatch = (p.label || '') === targetLabel;
+        if (isMatch && !found) {
+          found = true;
+          return { ...p, isPrimary: true };
+        }
+        return { ...p, isPrimary: false };
+      });
+      return { ...prev, phones: newPhones };
+    });
+  };
+
+  const handleRemoveDept = (targetLabel: string) => {
+    setLocalContacts(prev => {
+      let newPhones = prev.phones.filter(p => (p.label || '') !== targetLabel);
+      if (newPhones.length > 0 && !newPhones.some(p => p.isPrimary)) {
+        newPhones[0].isPrimary = true;
+      }
+      return { ...prev, phones: newPhones };
+    });
+  };
+
+  const handleRemovePhoneItem = (idx: number) => {
+    setLocalContacts(prev => {
+      let newPhones = prev.phones.filter((_, i) => i !== idx);
+      if (newPhones.length > 0 && !newPhones.some(p => p.isPrimary)) {
+        newPhones[0].isPrimary = true;
+      }
+      return { ...prev, phones: newPhones };
+    });
+  };
+
+  const handleSocialUrlChange = (idx: number, url: string) => {
+    setLocalContacts(prev => {
+      const newSocials = prev.socials.map((s, i) => i === idx ? { ...s, url } : s);
+      return { ...prev, socials: newSocials };
+    });
+  };
+
+  const handleSocialLabelChange = (idx: number, label: string) => {
+    setLocalContacts(prev => {
+      const newSocials = prev.socials.map((s, i) => i === idx ? { ...s, label } : s);
+      return { ...prev, socials: newSocials };
+    });
+  };
+
+  const defaultPrefixes: Record<string, string> = {
+    telegram: 'https://t.me/',
+    instagram: 'https://instagram.com/',
+    whatsapp: 'https://wa.me/',
+    vk: 'https://vk.com/',
+    website: 'https://',
+    email: ''
+  };
+
+  const sortSocials = (socials: any[]) => {
+    const typeOrder = ['telegram', 'whatsapp', 'instagram', 'email', 'website', 'vk'];
+    return [...socials].sort((a, b) => {
+      const idxA = typeOrder.indexOf(a.type);
+      const idxB = typeOrder.indexOf(b.type);
+      return idxA - idxB;
+    });
+  };
+
+  const handleAddSocial = (type: string) => {
+    setLocalContacts(prev => {
+      const initialUrl = defaultPrefixes[type] || '';
+      const newSocials = sortSocials([...prev.socials, { type, url: initialUrl, label: '' }]);
+      return { ...prev, socials: newSocials };
+    });
+  };
+
+  const handleRemoveSocial = (idx: number) => {
+    setLocalContacts(prev => {
+      const newSocials = prev.socials.filter((_, i) => i !== idx);
+      return { ...prev, socials: newSocials };
+    });
+  };
+
+  const availableSocialTypes = [
+    { type: 'telegram', label: 'Telegram' },
+    { type: 'whatsapp', label: 'WhatsApp' },
+    { type: 'instagram', label: 'Instagram' },
+    { type: 'email', label: 'Email' },
+    { type: 'website', label: 'Website' },
+    { type: 'vk', label: 'ВКонтакте' }
+  ];
+
+  const currentTypes = localContacts.socials.map(s => s.type);
+  const remainingTypes = availableSocialTypes.filter(t => !currentTypes.includes(t.type));
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl relative overflow-hidden space-y-6">
+      <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-3xl rounded-full pointer-events-none" />
+      <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-xl">
+            <Share2 className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              {lang === 'en' ? 'Project Contacts & Socials' : 'Единые контакты проекта'}
+            </h3>
+            <p className="text-xs text-zinc-400">
+              {lang === 'en' 
+                ? 'Centralized contacts (phones, address, socials) for all cards & blocks' 
+                : 'Единые данные поддержки, телефонов, физического адреса и соцсетей'}
+            </p>
+          </div>
+        </div>
+        <button 
+          onClick={handleSaveAll}
+          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] uppercase tracking-wider font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20 active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+        >
+          <CheckCircle2 className="w-4 h-4" />
+          {lang === 'en' ? 'Save Contacts' : 'Сохранить контакты'}
+        </button>
+      </div>
+
+      <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Name & Address */}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-zinc-400 mb-1.5 flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-indigo-400" />
+              {lang === 'en' ? 'Contact Name (vCard)' : 'Имя контакта для vCard'}
+            </label>
+            <input 
+              type="text"
+              value={localContacts.contactName || ''}
+              onChange={e => handleContactNameChange(e.target.value)}
+              placeholder={lang === 'en' ? 'e.g. Alexey Ivanov' : 'Например: Алексей Иванов'}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-zinc-200 font-medium focus:outline-none focus:border-indigo-500 transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-zinc-400 mb-1.5 flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+              {lang === 'en' ? 'Physical Address (Google Maps Pin)' : 'Физический адрес (Геометка на карте)'}
+            </label>
+            <textarea 
+              rows={2}
+              value={localContacts.address || ''}
+              onChange={e => handleAddressChange(e.target.value)}
+              placeholder={lang === 'en' ? 'e.g. Moscow, Tverskaya St. 12' : 'Например: Москва, ул. Тверская, 12'}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-zinc-200 font-medium focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+            />
+            <p className="text-[10px] text-zinc-500 mt-1">
+              {lang === 'en' 
+                ? 'Creates an interactive Google Map modal pin in the Socials block automatically.'
+                : 'Автоматически добавляет кнопку интерактивной карты в блок контактов при заполненном адресе.'}
+            </p>
+
+            {/* Map Links (Yandex, 2GIS, etc.) */}
+            <div className="space-y-2 mt-4 pl-3 border-l-2 border-zinc-700">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-zinc-400 flex items-center gap-1">
+                  <Globe className="w-3.5 h-3.5 text-indigo-400" />
+                  {lang === 'en' ? 'Map / Location Links (Yandex, 2GIS)' : 'Ссылки на карты (Яндекс, 2ГИС и др.)'}
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAddMapLink}
+                  className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {lang === 'en' ? 'Add Link' : 'Добавить ссылку'}
+                </button>
+              </div>
+              
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {(localContacts.mapLinks || []).map((link, idx) => (
+                  <div key={idx} className="bg-white/5 border border-white/10 p-2.5 rounded-xl flex flex-col gap-2 relative">
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="text"
+                        value={link.label}
+                        onChange={e => handleMapLinkChange(idx, 'label', e.target.value)}
+                        placeholder={lang === 'en' ? 'Service Name (e.g. Yandex Maps)' : 'Название (например: Яндекс Карты)'}
+                        className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMapLink(idx)}
+                        className="p-1.5 text-zinc-400 hover:text-rose-400 transition-colors"
+                        title={lang === 'en' ? 'Delete' : 'Удалить'}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <input 
+                      type="url"
+                      value={link.url}
+                      onChange={e => handleMapLinkChange(idx, 'url', e.target.value)}
+                      placeholder={lang === 'en' ? 'URL Link to location' : 'Ссылка на локацию'}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                ))}
+                {(localContacts.mapLinks || []).length === 0 && (
+                  <p className="text-[10px] text-zinc-500 italic">
+                    {lang === 'en' ? 'No custom map links added.' : 'Нет дополнительных ссылок на карты.'}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Phones & Departments */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-zinc-400 flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5 text-indigo-400" />
+              {lang === 'en' ? 'Phone Numbers & Departments' : 'Телефоны и отделы'}
+            </label>
+            <button
+              type="button"
+              onClick={handleAddDepartment}
+              className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors cursor-pointer bg-indigo-600/20 px-2.5 py-1 rounded-lg border border-indigo-500/30"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              {lang === 'en' ? 'Add Department' : 'Добавить отдел'}
+            </button>
+          </div>
+
+          <div className="space-y-4 max-h-[450px] overflow-y-auto pr-1">
+            {(() => {
+              const deptMap = new Map<string, { label: string; isMain: boolean; items: { idx: number; number: string; isPrimary: boolean; isVisible?: boolean }[] }>();
+              (localContacts.phones || []).forEach((phone, idx) => {
+                const label = phone.label || '';
+                if (!deptMap.has(label)) {
+                  deptMap.set(label, { label, isMain: false, items: [] });
+                }
+                const dept = deptMap.get(label)!;
+                dept.items.push({ idx, number: phone.number, isPrimary: phone.isPrimary, isVisible: phone.isVisible });
+                if (phone.isPrimary) dept.isMain = true;
+              });
+
+              const depts = Array.from(deptMap.values());
+              depts.sort((a, b) => (b.isMain ? 1 : 0) - (a.isMain ? 1 : 0));
+
+              return depts.map((dept, dIdx) => (
+                <div key={dIdx} className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-3 shadow-sm">
+                  {/* Department Header */}
+                  <div className="flex items-center gap-2 pb-2 border-b border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => handleSetPrimaryDept(dept.label)}
+                      className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
+                        dept.isMain 
+                          ? 'bg-indigo-600 text-white shadow-xs' 
+                          : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                      }`}
+                      title={lang === 'en' ? 'Set department as main' : 'Сделать этот отдел основным'}
+                    >
+                      {dept.isMain && <CheckCircle2 className="w-3 h-3" />}
+                      {dept.isMain 
+                        ? (lang === 'en' ? 'Main' : 'Основной') 
+                        : (lang === 'en' ? 'Make main' : 'Сделать осн.')}
+                    </button>
+
+                    <input
+                      type="text"
+                      value={dept.label}
+                      onChange={e => handleUpdateDeptLabel(dept.label, e.target.value)}
+                      placeholder={lang === 'en' ? 'Department name (e.g. Sales)' : 'Название отдела (например: Отдел продаж)'}
+                      className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs font-bold text-zinc-200 focus:outline-none focus:border-indigo-500"
+                    />
+
+                    {depts.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveDept(dept.label)}
+                        className="p-1.5 text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer shrink-0"
+                        title={lang === 'en' ? 'Remove department' : 'Удалить отдел'}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Department Phone Numbers */}
+                  <div className="space-y-2">
+                    {dept.items.map((item, pIdx) => (
+                      <div key={item.idx} className="flex items-center gap-2">
+                        <label className="flex items-center gap-1 text-[11px] text-zinc-400 cursor-pointer select-none shrink-0" title={lang === 'en' ? 'Show in final view' : 'Показывать в финале'}>
+                          <input
+                            type="checkbox"
+                            checked={item.isVisible !== false}
+                            onChange={e => handlePhoneVisibilityChange(item.idx, e.target.checked)}
+                            className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="text-[10px]">{lang === 'en' ? 'Show' : 'Показ.'}</span>
+                        </label>
+
+                        <input 
+                          type="text"
+                          value={item.number}
+                          onChange={e => handlePhoneChange(item.idx, e.target.value)}
+                          placeholder="+7 (999) 000-00-00"
+                          className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 font-mono focus:outline-none focus:border-indigo-500"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => handleAddPhoneToDept(dept.label)}
+                          className="p-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center justify-center border border-indigo-500/30"
+                          title={lang === 'en' ? 'Add another number to this department' : 'Добавить номер в этот отдел'}
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+
+                        {dept.items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePhoneItem(item.idx)}
+                            className="p-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center justify-center border border-rose-500/30"
+                            title={lang === 'en' ? 'Remove this number' : 'Удалить этот номер'}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      </div>
+
+      {/* Socials & Messengers */}
+      <div className="relative z-10 pt-4 border-t border-zinc-800 space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold text-zinc-400 flex items-center gap-1.5">
+            <Share2 className="w-3.5 h-3.5 text-indigo-400" />
+            {lang === 'en' ? 'Social Networks & Links' : 'Социальные сети и ссылки'}
+          </label>
+          
+          {remainingTypes.length > 0 && (
+            <div className="flex items-center gap-1 flex-wrap justify-end">
+              <span className="text-[10px] text-zinc-500 font-bold uppercase mr-1">
+                {lang === 'en' ? 'Add:' : 'Добавить:'}
+              </span>
+              {remainingTypes.map(st => (
+                <button
+                  key={st.type}
+                  type="button"
+                  onClick={() => handleAddSocial(st.type)}
+                  className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-[10px] font-medium border border-zinc-700 transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-2.5 h-2.5" />
+                  {st.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {(() => {
+            const socialMap = new Map();
+            localContacts.socials.forEach((s, idx) => {
+              if (!socialMap.has(s.type)) {
+                socialMap.set(s.type, { type: s.type, items: [] });
+              }
+              socialMap.get(s.type).items.push({ idx, label: s.label || '', url: s.url });
+            });
+
+            return Array.from(socialMap.values()).map((group, gIdx) => (
+              <div key={gIdx} className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-3 shadow-sm">
+                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                  <span className="text-[10px] uppercase font-black text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md shrink-0">
+                    {group.type}
+                  </span>
+                  
+                  <button
+                    type="button"
+                    onClick={() => handleAddSocial(group.type)}
+                    className="px-2 py-1 text-zinc-400 hover:text-indigo-400 transition-colors cursor-pointer shrink-0 flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 rounded border border-zinc-700"
+                    title={lang === 'en' ? 'Add another' : 'Добавить ещё'}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-medium">{lang === 'en' ? 'Add link' : 'Добавить'}</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {group.items.map((item) => (
+                    <div key={item.idx} className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={item.label}
+                          onChange={e => handleSocialLabelChange(item.idx, e.target.value)}
+                          placeholder={lang === 'en' ? 'Label (e.g. CEO, Support)' : 'Подпись (например: Руководитель, Общий)'}
+                          className="flex-1 bg-zinc-950/50 border border-zinc-800/80 rounded-md px-2 py-1 text-[10px] text-zinc-300 focus:outline-none focus:border-indigo-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSocial(item.idx)}
+                          className="p-1.5 text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer shrink-0"
+                          title={lang === 'en' ? 'Remove' : 'Удалить'}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <input 
+                        type="text"
+                        value={item.url}
+                        onChange={e => handleSocialUrlChange(item.idx, e.target.value)}
+                        placeholder={
+                          group.type === 'telegram' ? 'https://t.me/username' :
+                          group.type === 'whatsapp' ? 'https://wa.me/79001234567' :
+                          group.type === 'email' ? 'support@example.com' :
+                          group.type === 'website' ? 'https://mywebsite.com' : 'URL or login'
+                        }
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 font-mono focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ));
+          })()}
+        </div>
+      </div>
+
+      <div className="relative z-10 pt-4 border-t border-zinc-800 flex justify-end">
+        <button
+          type="button"
+          onClick={handleSaveAll}
+          className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-indigo-600/20 transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+        >
+          <CheckCircle2 className="w-4 h-4" />
+          {lang === 'en' ? 'Save Contacts' : 'Сохранить контакты'}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({ lang }) => {
   const {
@@ -625,6 +1186,16 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ lang }) => {
           </div>
 
         </div>
+
+        {/* Unified Project Contacts Section */}
+        {activeProject && (
+          <ProjectContactsSection 
+            activeProject={activeProject}
+            updateProject={updateProject}
+            lang={lang}
+            toastSuccess={toastSuccess}
+          />
+        )}
 
         {/* Ecom Orders Section */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">

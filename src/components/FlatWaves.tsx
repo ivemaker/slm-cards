@@ -194,22 +194,29 @@ export default function FlatWaves({ settings }: FlatWavesProps) {
       for (let i = 0; i < positionAttribute.count; i++) {
           const vd = vertexData[i];
           
-          // Позиция вершины с учетом настроек хаотичности (джиттера)
-          const actualX = vd.origX + vd.jitterOffsetX * current.jitter;
-          const actualZ = vd.origZ + vd.jitterOffsetZ * current.jitter;
+          const wl = Math.max(0.001, current.wavelength || 1);
+          const amp = isNaN(current.amplitude) ? 1 : current.amplitude;
+          const jit = isNaN(current.jitter) ? 0 : current.jitter;
 
-          const kx = 0.008 / current.wavelength;
-          const kz = 0.012 / current.wavelength;
+          // Позиция вершины с учетом настроек хаотичности (джиттера)
+          const actualX = vd.origX + vd.jitterOffsetX * jit;
+          const actualZ = vd.origZ + vd.jitterOffsetZ * jit;
+
+          const kx = 0.008 / wl;
+          const kz = 0.012 / wl;
 
           // Три наложенные друг на друга тригонометрические волны для природной хаотичности
-          const wave1 = Math.sin(actualX * kx + time * 1.5) * 20 * current.amplitude;
-          const wave2 = Math.cos(actualZ * kz + time * 1.2) * 15 * current.amplitude;
-          const wave3 = Math.sin((actualX + actualZ) * (0.01 / current.wavelength) + time) * 10 * current.amplitude;
+          const wave1 = Math.sin(actualX * kx + time * 1.5) * 20 * amp;
+          const wave2 = Math.cos(actualZ * kz + time * 1.2) * 15 * amp;
+          const wave3 = Math.sin((actualX + actualZ) * (0.01 / wl) + time) * 10 * amp;
           
+          let yVal = vd.origY + wave1 + wave2 + wave3;
+          if (isNaN(yVal)) yVal = vd.origY;
+
           positionAttribute.setXYZ(
             i, 
             actualX, 
-            vd.origY + wave1 + wave2 + wave3, 
+            yVal, 
             actualZ
           );
       }

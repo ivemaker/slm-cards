@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Block, SocialsIconStyle } from '../../types';
-import { useDev } from '../../context/DevContext';
+import { useDev, ProjectContacts, getDefaultContacts } from '../../context/DevContext';
 import { 
   Sparkles, 
   Palette, 
@@ -11,7 +11,13 @@ import {
   Sliders,
   Maximize2,
   Trash2,
-  Plus
+  Plus,
+  Phone,
+  MapPin,
+  Share2,
+  CheckCircle2,
+  User,
+  Globe
 } from 'lucide-react';
 
 interface SocialsInspectorProps {
@@ -27,103 +33,137 @@ export const SocialsInspector: React.FC<SocialsInspectorProps> = ({
 }) => {
   const socials = focusedBlock.socialsContent!;
   const [openSection, setOpenSection] = useState<string | null>('preset');
-  const { projects, activeProjectId } = useDev();
+  const { projects, activeProjectId, updateProject } = useDev();
   const activeProject = projects.find(p => p.id === activeProjectId);
-  
-  const hasPhone = socials.links.some(l => l.platform === 'phone');
 
-  const addLink = (platform: string) => {
-    const newLink = { platform: platform as any, url: platform === 'email' ? 'mailto:' : 'https://' };
-    updateFocusedBlock(b => ({
-      socialsContent: {
-        ...b.socialsContent!,
-        links: [...b.socialsContent!.links, newLink]
-      }
-    }));
+  const [localContacts, setLocalContacts] = useState<ProjectContacts>(() => {
+    return activeProject?.contacts || getDefaultContacts(activeProject?.name || '');
+  });
+
+  useEffect(() => {
+    if (activeProject?.contacts) {
+      setLocalContacts(activeProject.contacts);
+    } else if (activeProject?.name) {
+      setLocalContacts(getDefaultContacts(activeProject.name));
+    }
+  }, [activeProject?.id, activeProject?.contacts]);
+
+  const saveContacts = (updated: ProjectContacts) => {
+    if (activeProject) {
+      updateProject(activeProject.id, { contacts: updated });
+    }
   };
 
-  const removeLink = (idx: number) => {
-    updateFocusedBlock(b => ({
-      socialsContent: {
-        ...b.socialsContent!,
-        links: b.socialsContent!.links.filter((_, i) => i !== idx)
-      }
-    }));
+  const handleContactNameChange = (val: string) => {
+    setLocalContacts(prev => ({ ...prev, contactName: val }));
   };
 
-  const updateLink = (idx: number, url: string) => {
-    updateFocusedBlock(b => ({
-      socialsContent: {
-        ...b.socialsContent!,
-        links: b.socialsContent!.links.map((l, i) => i === idx ? { ...l, url } : l)
-      }
-    }));
+  const handleAddressChange = (val: string) => {
+    setLocalContacts(prev => ({ ...prev, address: val }));
   };
 
-  const addPhone = () => {
-    updateFocusedBlock(b => {
-      const currentPhones = b.socialsContent?.phones || [];
-      return {
-        socialsContent: {
-          ...b.socialsContent!,
-          phones: [...currentPhones, { number: '', isPrimary: currentPhones.length === 0 }]
-        }
+  const handleAddMapLink = () => {
+    setLocalContacts(prev => {
+      const updated = {
+        ...prev,
+        mapLinks: [...(prev.mapLinks || []), { label: '', url: '' }]
       };
+      saveContacts(updated);
+      return updated;
     });
   };
 
-  const removePhone = (idx: number) => {
-    updateFocusedBlock(b => {
-      const currentPhones = b.socialsContent?.phones || [];
-      const newPhones = currentPhones.filter((_, i) => i !== idx);
-      // Ensure one is primary if the list is not empty
+  const handleRemoveMapLink = (idx: number) => {
+    setLocalContacts(prev => {
+      const updated = {
+        ...prev,
+        mapLinks: (prev.mapLinks || []).filter((_, i) => i !== idx)
+      };
+      saveContacts(updated);
+      return updated;
+    });
+  };
+
+  const handleMapLinkChange = (idx: number, field: 'label' | 'url', val: string) => {
+    setLocalContacts(prev => {
+      const updated = {
+        ...prev,
+        mapLinks: (prev.mapLinks || []).map((link, i) => i === idx ? { ...link, [field]: val } : link)
+      };
+      saveContacts(updated);
+      return updated;
+    });
+  };
+
+  const handlePhoneChange = (idx: number, number: string) => {
+    setLocalContacts(prev => {
+      const newPhones = prev.phones.map((p, i) => i === idx ? { ...p, number: number.replace(/[^\d+]/g, '') } : p);
+      return { ...prev, phones: newPhones };
+    });
+  };
+
+  const handleSetPrimaryPhone = (idx: number) => {
+    setLocalContacts(prev => {
+      const newPhones = prev.phones.map((p, i) => ({ ...p, isPrimary: i === idx }));
+      const updated = { ...prev, phones: newPhones };
+      saveContacts(updated);
+      return updated;
+    });
+  };
+
+  const handleAddPhone = () => {
+    setLocalContacts(prev => {
+      const newPhones = [...prev.phones, { number: '', isPrimary: prev.phones.length === 0 }];
+      const updated = { ...prev, phones: newPhones };
+      saveContacts(updated);
+      return updated;
+    });
+  };
+
+  const handleRemovePhone = (idx: number) => {
+    setLocalContacts(prev => {
+      let newPhones = prev.phones.filter((_, i) => i !== idx);
       if (newPhones.length > 0 && !newPhones.some(p => p.isPrimary)) {
         newPhones[0].isPrimary = true;
       }
-      return {
-        socialsContent: {
-          ...b.socialsContent!,
-          phones: newPhones
-        }
-      };
+      const updated = { ...prev, phones: newPhones };
+      saveContacts(updated);
+      return updated;
     });
   };
 
-  const updatePhone = (idx: number, updates: Partial<{ number: string; isPrimary: boolean }>) => {
-    updateFocusedBlock(b => {
-      const currentPhones = b.socialsContent?.phones || [];
-      let newPhones = currentPhones.map((p, i) => i === idx ? { ...p, ...updates } : p);
-      
-      // Validation for number
-      if (updates.number !== undefined) {
-        newPhones[idx].number = updates.number.replace(/[^\d+]/g, '');
-      }
-
-      // If this one is set to primary, unset others
-      if (updates.isPrimary) {
-        newPhones = newPhones.map((p, i) => ({ ...p, isPrimary: i === idx }));
-      }
-      // If we are unsetting primary, but it's the last one, prevent it (just enforce true)
-      if (updates.isPrimary === false && !newPhones.some(p => p.isPrimary) && newPhones.length > 0) {
-        newPhones[0].isPrimary = true;
-      }
-
-      return {
-        socialsContent: {
-          ...b.socialsContent!,
-          phones: newPhones
-        }
-      };
+  const handleSocialUrlChange = (idx: number, url: string) => {
+    setLocalContacts(prev => {
+      const newSocials = prev.socials.map((s, i) => i === idx ? { ...s, url } : s);
+      return { ...prev, socials: newSocials };
     });
   };
 
-  const updateContactName = (name: string) => {
-    updateFocusedBlock(b => ({
-      socialsContent: {
-        ...b.socialsContent!,
-        contactName: name.trim() === '' ? undefined : name
-      }
-    }));
+  const handleSocialLabelChange = (idx: number, label: string) => {
+    setLocalContacts(prev => {
+      const newSocials = prev.socials.map((s, i) => i === idx ? { ...s, label } : s);
+      const updated = { ...prev, socials: newSocials };
+      saveContacts(updated);
+      return updated;
+    });
+  };
+
+  const handleAddSocial = (type: string) => {
+    setLocalContacts(prev => {
+      const newSocials = [...prev.socials, { type, url: '', label: '' }];
+      const updated = { ...prev, socials: newSocials };
+      saveContacts(updated);
+      return updated;
+    });
+  };
+
+  const handleRemoveSocial = (idx: number) => {
+    setLocalContacts(prev => {
+      const newSocials = prev.socials.filter((_, i) => i !== idx);
+      const updated = { ...prev, socials: newSocials };
+      saveContacts(updated);
+      return updated;
+    });
   };
 
   // Icon Custom Style Presets
@@ -288,114 +328,8 @@ export const SocialsInspector: React.FC<SocialsInspectorProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* SECTION: SOCIAL LINK CHANNELS */}
-      <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5 mt-1.5">
-        <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />
-        <span>{lang === 'en' ? 'Social Link Channels' : 'КАНАЛЫ СВЯЗИ И ССЫЛКИ'}</span>
-      </div>
-
-      {/* 1. SOCIAL LINK CHANNELS LIST */}
-      <div className="space-y-3">
-        <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
-          {socials.links.map((link, idx) => (
-            <div key={idx} className="bg-zinc-900 border border-zinc-850 p-2 rounded-lg space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[8px] font-mono uppercase bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-300 font-extrabold">{link.platform}</span>
-                <button onClick={() => removeLink(idx)} className="text-[9px] font-mono text-red-400 uppercase font-bold cursor-pointer">Delete</button>
-              </div>
-              {link.platform === 'phone' ? (
-                <div className="space-y-3 pt-1">
-                  <div>
-                    <label className="block text-[9px] uppercase font-bold text-zinc-500 tracking-wider mb-1">
-                      {lang === 'en' ? 'Contact Name (for save)' : 'Имя контакта (для сохранения)'}
-                    </label>
-                    <input
-                      type="text"
-                      value={socials.contactName || ''}
-                      onChange={(e) => updateContactName(e.target.value)}
-                      placeholder={activeProject?.name || 'Contact Name'}
-                      className="w-full bg-zinc-950 border border-zinc-800 text-[10px] rounded p-2 text-white focus:outline-none focus:border-zinc-700"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-[9px] uppercase font-bold text-zinc-500 tracking-wider">
-                      {lang === 'en' ? 'Phone Numbers' : 'Номера телефонов'}
-                    </label>
-                    <div className="space-y-2">
-                      {(socials.phones || []).map((phone, pIdx) => (
-                        <div key={pIdx} className="bg-zinc-950 border border-zinc-800 p-1.5 rounded flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name={`primary-phone-${focusedBlock.id}`}
-                            checked={phone.isPrimary}
-                            onChange={() => updatePhone(pIdx, { isPrimary: true })}
-                            title={lang === 'en' ? 'Set as Primary' : 'Основной номер'}
-                            className="accent-orange-500 w-3 h-3 cursor-pointer ml-1"
-                          />
-                          <input
-                            type="tel"
-                            value={phone.number}
-                            onChange={(e) => updatePhone(pIdx, { number: e.target.value })}
-                            placeholder="+1234567890"
-                            className="flex-1 min-w-0 bg-transparent text-[10px] text-white font-mono focus:outline-none"
-                          />
-                          <button 
-                            onClick={() => removePhone(pIdx)} 
-                            className="p-1 text-zinc-500 hover:text-red-400 hover:bg-zinc-900 rounded transition-colors"
-                            title={lang === 'en' ? 'Remove number' : 'Удалить номер'}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={addPhone}
-                      className="w-full py-1.5 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded text-[9px] font-bold uppercase text-zinc-400 flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      <Plus className="w-3 h-3" />
-                      {lang === 'en' ? 'Add Phone Number' : 'Добавить номер'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <input
-                  type="text"
-                  value={link.url}
-                  onChange={(e) => updateLink(idx, e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-[10px] rounded p-1.5 text-white font-mono focus:outline-none"
-                />
-              )}
-            </div>
-          ))}
-        </div>
-        <div className="pt-1.5 border-t border-zinc-900">
-          <select
-            defaultValue=""
-            onChange={(e) => {
-              if (e.target.value) {
-                addLink(e.target.value);
-                e.target.value = "";
-              }
-            }}
-            className="bg-zinc-900 hover:bg-zinc-850 text-[10px] font-mono text-zinc-300 uppercase font-semibold border border-zinc-800 p-2 rounded focus:outline-none w-full cursor-pointer"
-          >
-            <option value="">+ Add Social Link...</option>
-            <option value="instagram">Instagram</option>
-            <option value="telegram">Telegram</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="twitter">X / Twitter</option>
-            <option value="linkedin">LinkedIn</option>
-            <option value="github">GitHub</option>
-            <option value="email">Email</option>
-            <option value="phone">Phone / Call</option>
-            <option value="website">Custom Website</option>
-          </select>
-        </div>
-      </div>
-
       {/* 2. ICON LAYOUT CONFIGURATION */}
-      <div className="pt-3 border-t border-zinc-800/60 space-y-3.5">
+      <div className="space-y-3.5">
         {/* SECTION: LAYOUT & STYLE */}
         <div className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5">
           <span className="w-1.5 h-3.5 bg-orange-500 rounded-full" />

@@ -159,13 +159,18 @@ export function LiquidRipples({ settings }: LiquidRipplesProps) {
           const px = ix * separation - ((gridX * separation) / 2);
           const pz = iy * separation - ((gridY * separation) / 2);
 
+          const waveFreq = Math.max(0.0001, s.waveFrequency || 0.01);
+          const waveAmp = isNaN(s.waveAmplitude) ? 10 : s.waveAmplitude;
+
           // Формула сложной 3D волны (суперпозиция двух синусоид по осям X и Y)
-          const py = (Math.sin((ix + count) * s.waveFrequency) * s.waveAmplitude) + 
-                     (Math.sin((iy + count) * s.waveFrequency * 1.66) * s.waveAmplitude);
+          let py = (Math.sin((ix + count) * waveFreq) * waveAmp) + 
+                   (Math.sin((iy + count) * waveFreq * 1.66) * waveAmp);
+          if (isNaN(py)) py = 0;
 
           // Размер точки колеблется в такт волне
-          const pScale = (Math.sin((ix + count) * s.waveFrequency) + 1) * 2 + 
-                         (Math.sin((iy + count) * s.waveFrequency * 1.66) * 1.5 + 1.5);
+          let pScale = (Math.sin((ix + count) * waveFreq) + 1) * 2 + 
+                       (Math.sin((iy + count) * waveFreq * 1.66) * 1.5 + 1.5);
+          if (isNaN(pScale)) pScale = 1;
 
           positions[idx * 3] = px;
           positions[idx * 3 + 1] = py;

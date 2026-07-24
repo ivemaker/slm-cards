@@ -189,13 +189,16 @@ export default function WebGLPolylines({ settings }: WebGLPolylinesProps) {
 
     const rnd = (min: number, max: number) => Math.random() * (max - min) + min;
 
-    const dx = 2 / settings.nx;
-    const dy = -2 / (settings.ny - 1);
+    const safeNx = Math.max(1, settings.nx || 1);
+    const safeNy = Math.max(2, settings.ny || 2);
+
+    const dx = 2 / safeNx;
+    const dy = -2 / (safeNy - 1);
     const ox = -1 + dx / 2;
     const oy = 1;
 
     // Матрица поворота 2D на основе заданного угла
-    const angleRad = (settings.angle * Math.PI) / 180;
+    const angleRad = ((settings.angle || 0) * Math.PI) / 180;
     const mat2 = new Float32Array([
       Math.cos(angleRad), -Math.sin(angleRad),
       Math.sin(angleRad),  Math.cos(angleRad)
@@ -205,9 +208,9 @@ export default function WebGLPolylines({ settings }: WebGLPolylinesProps) {
     const meshes: THREE.Mesh[] = [];
 
     // Создаём сетку полилиний
-    for (let i = 0; i < settings.nx; i++) {
+    for (let i = 0; i < safeNx; i++) {
       const points: THREE.Vector3[] = [];
-      for (let j = 0; j < settings.ny; j++) {
+      for (let j = 0; j < safeNy; j++) {
         const x = ox + i * dx;
         const y = oy + j * dy;
         points.push(new THREE.Vector3(x, y, 0));
@@ -215,15 +218,15 @@ export default function WebGLPolylines({ settings }: WebGLPolylinesProps) {
 
       const polyline = new PolylineHelper(points);
       
-      const col1 = chroma(cscale(i / settings.nx).hex()).rgb();
-      const col2 = chroma(cscale(i / settings.nx).darken(settings.darken).hex()).rgb();
+      const col1 = chroma(cscale(i / safeNx).hex()).rgb();
+      const col2 = chroma(cscale(i / safeNx).darken(settings.darken || 0).hex()).rgb();
 
       const material = new THREE.ShaderMaterial({
         uniforms: {
           uTime: uniformsRef.current.uTime,
           uTimeCoef: uniformsRef.current.uTimeCoef,
           uMat2: { value: mat2 },
-          uSize: { value: (1.5 / settings.nx) * settings.thickness },
+          uSize: { value: (1.5 / safeNx) * (settings.thickness || 1) },
           uRnd1: { value: new THREE.Vector3(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)) },
           uRnd2: { value: new THREE.Vector3(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)) },
           uRnd3: { value: new THREE.Vector3(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)) },

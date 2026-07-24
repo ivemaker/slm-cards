@@ -243,6 +243,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, lang, setLang })
               {activeTab === 'dashboard' && (lang === 'en' ? 'Performance Insights' : 'Аналитика и статистика')}
               {activeTab === 'settings' && (lang === 'en' ? 'Platform Configuration' : 'Конфигурация платформы')}
               {activeTab === 'preview' && (lang === 'en' ? 'Public View Sandbox' : 'Песочница публичного вида')}
+              {activeTab === 'profile_dashboard' && (lang === 'en' ? 'Account Dashboard' : 'Дашборд аккаунта')}
             </h2>
 
             {/* SAVE INDICATOR FOR EDITOR */}
