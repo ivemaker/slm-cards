@@ -14,7 +14,8 @@ import {
   X, 
   ChevronRight, 
   AlertCircle,
-  Pencil
+  Pencil,
+  Copy
 } from 'lucide-react';
 
 interface ProjectsTabProps {
@@ -73,8 +74,14 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
     createProject, 
     deleteProject, 
     setActiveTab,
-    updateProject
+    updateProject,
+    cloneProject,
+    isCollabMode
   } = useDev();
+
+  const filteredProjects = isCollabMode 
+    ? projects.filter(p => p.collaborators?.some(c => c.email === 'collab@slmcards.io'))
+    : projects;
 
   const { success: toastSuccess } = useToast();
 
@@ -256,7 +263,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
         </button>
 
         {/* Existing Projects */}
-        {projects.map((project) => {
+        {filteredProjects.map((project) => {
           const createdDate = parseProjectDate(project.createdAt);
           const msInDay = 24 * 60 * 60 * 1000;
           const diffDays = Math.floor((Date.now() - createdDate.getTime()) / msInDay);
@@ -303,18 +310,32 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
                     </div>
                   </div>
 
-                  {/* Refined Small action buttons (quieter opacity, fully distinct hover) */}
+                  {/* Refined Small action buttons */}
                   <div className="flex items-center gap-1 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity duration-300">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenQuickEdit(project);
-                      }}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-indigo-400 hover:bg-indigo-500/10 border border-transparent hover:border-zinc-800 transition-all"
-                      title={lang === 'en' ? 'Quick Edit' : 'Быстрое редактирование'}
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
+                    {project.userRole === 'owner' && !isCollabMode && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenQuickEdit(project);
+                          }}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-indigo-400 hover:bg-indigo-500/10 border border-transparent hover:border-zinc-800 transition-all"
+                          title={lang === 'en' ? 'Quick Edit' : 'Быстрое редактирование'}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            cloneProject(project.id);
+                          }}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/10 border border-transparent hover:border-zinc-800 transition-all"
+                          title={lang === 'en' ? 'Clone Project' : 'Клонировать проект'}
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -325,17 +346,19 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
                     >
                       <Settings className="w-3.5 h-3.5" />
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setProjectToDelete(project.id);
-                      }}
-                      id={`btn-delete-project-${project.id}`}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-950/20 transition-all"
-                      title={lang === 'en' ? 'Delete Project' : 'Удалить проект'}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {project.userRole === 'owner' && !isCollabMode && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setProjectToDelete(project.id);
+                        }}
+                        id={`btn-delete-project-${project.id}`}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-950/20 transition-all"
+                        title={lang === 'en' ? 'Delete Project' : 'Удалить проект'}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -344,6 +367,11 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
               <div className="flex items-end justify-between border-t border-zinc-900/50 pt-4">
                 <div className="flex flex-wrap gap-2 items-center">
                   {/* Type Badge */}
+                  {project.userRole === 'collaborator' && (
+                    <span className="text-[9px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md border bg-zinc-800 text-zinc-400 border-zinc-700">
+                      {lang === 'en' ? 'Collaborator' : 'Соавтор'}
+                    </span>
+                  )}
                   <span className={`text-[9px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md border ${
                     project.type === 'personal_card'
                       ? 'bg-blue-500/5 text-blue-400 border-blue-500/10'
@@ -398,6 +426,49 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ lang }) => {
           );
         })}
       </div>
+
+      {/* Step 3: Stylish Project Creation Modal */}
+      <AnimatePresence>
+        {isQuickEditOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsQuickEditOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, y: 15, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: 15, opacity: 0 }}
+              className="relative w-full max-w-sm bg-zinc-950 border border-zinc-850 rounded-2xl p-6 shadow-2xl z-10"
+            >
+              <h3 className="text-lg font-bold text-white mb-4">
+                {lang === 'en' ? 'Quick Edit' : 'Быстрое редактирование'}
+              </h3>
+              <form onSubmit={handleSaveQuickEdit} className="space-y-4">
+                <input
+                  type="text"
+                  value={quickName}
+                  onChange={(e) => setQuickName(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  placeholder={lang === 'en' ? 'Project Name' : 'Имя проекта'}
+                />
+                <label className="flex items-center gap-2 cursor-pointer bg-zinc-900 hover:bg-zinc-800 p-3 rounded-xl border border-zinc-800 text-sm text-zinc-300">
+                  <Pencil className="w-4 h-4" />
+                  {lang === 'en' ? 'Change Avatar' : 'Сменить аватар'}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleQuickAvatarChange} />
+                </label>
+                <div className="flex justify-end gap-2 mt-4">
+                  <button type="button" onClick={() => setIsQuickEditOpen(false)} className="px-4 py-2 text-zinc-400 hover:text-white text-xs font-bold uppercase">{lang === 'en' ? 'Cancel' : 'Отмена'}</button>
+                  <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider">{lang === 'en' ? 'Save' : 'Сохранить'}</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Step 3: Stylish Project Creation Modal */}
       <AnimatePresence>

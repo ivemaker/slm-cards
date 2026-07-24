@@ -53,6 +53,8 @@ export interface MockProject {
   cart?: { blockId: string; name: string; price: number; quantity: number }[];
   customDomain?: string;
   premiumExpiredAt?: string;
+  userRole?: 'owner' | 'collaborator';
+  collaborators?: { email: string; accessLevel: 'view_only' | 'contacts_editor' | 'full_editor' }[];
   contacts?: ProjectContacts;
 }
 
@@ -75,6 +77,7 @@ export interface DevContextType {
   ) => void;
   updateProject: (id: string, updates: Partial<MockProject>) => void;
   deleteProject: (id: string) => void;
+  cloneProject: (projectId: string) => void;
   setActiveProjectId: (id: string | null) => void;
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
@@ -90,6 +93,11 @@ export interface DevContextType {
   cancelPreview: () => void;
   applyPreviewTemplate: () => void;
   userEmail: string;
+  dashboardSubTab: 'analytics' | 'project_settings';
+  setDashboardSubTab: (subTab: 'analytics' | 'project_settings') => void;
+  transferOwnership: (projectId: string, newOwnerEmail: string) => void;
+  isCollabMode: boolean;
+  setIsCollabMode: (mode: boolean) => void;
   userBalance: number;
   isBalanceHidden: boolean;
   toggleBalanceVisibility: () => void;
@@ -118,6 +126,8 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isSaving, setIsSaving] = useState(false);
   const [developerMode, setDeveloperMode] = useState<boolean>(() => getSaved<boolean>('slm_developer_mode', false));
   const [userEmail, setUserEmail] = useState<string>(() => getSaved<string>('slm_user_email', 'ivemaker@slmcards.io'));
+  const [dashboardSubTab, setDashboardSubTab] = useState<'analytics' | 'project_settings'>(() => getSaved<'analytics' | 'project_settings'>('slm_dashboard_subtab', 'analytics'));
+  const [isCollabMode, setIsCollabMode] = useState<boolean>(() => getSaved<boolean>('slm_collab_mode', false));
   const [userBalance, setUserBalance] = useState<number>(() => getSaved<number>('slm_user_balance', 1500));
   const [isBalanceHidden, setIsBalanceHidden] = useState<boolean>(() => getSaved<boolean>('slm_is_balance_hidden', false));
 
@@ -135,6 +145,23 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!email || !email.trim()) return;
     setUserEmail(email.trim());
     toast.success('Данные аккаунта успешно обновлены');
+  };
+
+  const transferOwnership = (projectId: string, newOwnerEmail: string) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          userRole: 'collaborator',
+          collaborators: [
+            ...(p.collaborators || []),
+            { email: newOwnerEmail, accessLevel: 'full_editor' }
+          ]
+        };
+      }
+      return p;
+    }));
+    toast.success('Вы передали права владельца!');
   };
 
   const [projectBackup, setProjectBackup] = useState<MockProject | null>(null);
@@ -208,6 +235,8 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       localStorage.setItem('slm_user_email', JSON.stringify(userEmail));
       localStorage.setItem('slm_user_balance', JSON.stringify(userBalance));
       localStorage.setItem('slm_is_balance_hidden', JSON.stringify(isBalanceHidden));
+      localStorage.setItem('slm_dashboard_subtab', JSON.stringify(dashboardSubTab));
+      localStorage.setItem('slm_collab_mode', JSON.stringify(isCollabMode));
 
       if (firstRender.current) {
         firstRender.current = false;
@@ -219,7 +248,7 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch (e) {
       console.error("Failed to write state to localStorage", e);
     }
-  }, [planType, activeTab, activeProjectId, projects, developerMode, isAuthenticated]);
+  }, [planType, activeTab, activeProjectId, projects, developerMode, isAuthenticated, dashboardSubTab, isCollabMode]);
 
   // Grace Period Background Check
   useEffect(() => {
@@ -331,6 +360,8 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       layout,
       themeStyle,
       createdAt: new Date().toISOString(),
+      userRole: 'owner',
+      collaborators: [],
       cart: [],
       contacts: getDefaultContacts(name)
     };
@@ -343,6 +374,28 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (activeProjectId === id) {
       setActiveProjectIdState(null);
     }
+  };
+
+  const cloneProject = (projectId: string) => {
+    const original = projects.find(p => p.id === projectId);
+    if (!original || original.userRole !== 'owner') return;
+
+    const newId = Math.random().toString(36).substr(2, 9);
+    const cloned: MockProject = {
+      ...JSON.parse(JSON.stringify(original)),
+      id: newId,
+      name: `${original.name} (Копия)`,
+      tariff: 'Basic',
+      plan: 'basic',
+      createdAt: new Date().toISOString(),
+      premiumExpiredAt: undefined,
+      userRole: 'owner',
+      collaborators: [],
+      orders: [],
+      cart: []
+    };
+    setProjects(prev => [...prev, cloned]);
+    toast.success('Проект успешно продублирован!');
   };
 
   const updateProject = (id: string, updates: Partial<MockProject>) => {
@@ -405,6 +458,7 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         createProject,
         updateProject,
         deleteProject,
+        cloneProject,
         setActiveProjectId,
         activeTab,
         setActiveTab,
@@ -419,7 +473,12 @@ export const DevProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         startPreview,
         cancelPreview,
         applyPreviewTemplate,
+        transferOwnership,
+        isCollabMode,
+        setIsCollabMode,
         userEmail,
+        dashboardSubTab,
+        setDashboardSubTab,
         userBalance,
         isBalanceHidden,
         toggleBalanceVisibility,

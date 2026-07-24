@@ -781,6 +781,7 @@ export default function App() {
     cancelPreview,
     applyPreviewTemplate,
     userEmail,
+    dashboardSubTab,
     userBalance,
     isBalanceHidden,
     toggleBalanceVisibility,
@@ -6533,7 +6534,9 @@ export default function App() {
                       <>
                         <span className="mx-2 text-zinc-600 font-normal">/</span>
                         <span className="text-zinc-400 font-normal">
-                          {lang === 'en' ? 'Analytics' : 'Аналитика'}
+                          {dashboardSubTab === 'project_settings' 
+                            ? (lang === 'en' ? 'Project Settings' : 'Настройки проекта')
+                            : (lang === 'en' ? 'Analytics' : 'Аналитика')}
                         </span>
                       </>
                     )}
